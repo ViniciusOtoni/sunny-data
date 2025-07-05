@@ -38,11 +38,9 @@ jobs:
         id: capture
         run: |
           cd infra
-          # captura e mascara o secret
           SECRET=$(terraform output -raw spn_client_secret)
           echo "::add-mask::$SECRET"
           echo "SPN_SECRET=$SECRET" >> $GITHUB_ENV
-          # captura o client_id
           ID=$(terraform output -raw spn_client_id)
           echo "SPN_ID=$ID" >> $GITHUB_ENV
 
@@ -53,7 +51,7 @@ jobs:
         run: |
           echo "SPN ID: $SPN_ID"
           echo "SPN Secret length: ${#SPN_SECRET}"
-
+          
     outputs:
       spn_client_id:     ${{ env.SPN_ID }}
       spn_client_secret: ${{ env.SPN_SECRET }}
