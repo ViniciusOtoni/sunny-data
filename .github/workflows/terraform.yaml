@@ -2,43 +2,64 @@ name: Terraform CI/CD
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch:
+    branches: [ main ]
+  workflow_dispatch: {}
 
 jobs:
-  terraform:
-    name: 'Terraform Apply'
+  create-spn:
+    name: Create SPN
     runs-on: ubuntu-latest
 
     env:
       TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-      TF_VAR_tenant_id: ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_tenant_id:       ${{ secrets.ARM_TENANT_ID }}
       TF_VAR_admin_client_id: ${{ secrets.ARM_CLIENT_ID }}
       TF_VAR_admin_client_secret: ${{ secrets.ARM_CLIENT_SECRET }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: 1.6.6 }
+      - name: Init & Plan SPN
+        run: |
+          cd infra
+          terraform init
+          terraform plan -target=module.service_principal -out=spnplan
+      - name: Apply SPN
+        run: |
+          cd infra
+          terraform apply -auto-approve spnplan
+      - name: Capture SPN outputs
+        id: spn
+        run: |
+          cd infra
+          echo "::set-output name=client_id::$(terraform output -raw spn_client_id)"
+          echo "::set-output name=client_secret::$(terraform output -raw client_secret)"
+    outputs:
+      spn_id: ${{ steps.spn.outputs.client_id }}
+      spn_secret: ${{ steps.spn.outputs.client_secret }}
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.6.6
+  deploy-infra:
+    name: Deploy Remaining Infra
+    needs: create-spn
+    runs-on: ubuntu-latest
 
-      - name: Terraform Init
-        run: terraform init
-        working-directory: ./infra
+    env:
+      TF_VAR_subscription_id:   ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id:         ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_spn_client_id:     ${{ needs.create-spn.outputs.spn_id }}
+      TF_VAR_spn_client_secret: ${{ needs.create-spn.outputs.spn_secret }}
 
-      - name: Terraform Validate
-        run: terraform validate
-        working-directory: ./infra
-
-      - name: Terraform Plan
-        run: terraform plan -out=tfplan
-        working-directory: ./infra
-
-      - name: Terraform Apply
-        if: github.ref == 'refs/heads/main'
-        run: terraform apply -auto-approve tfplan
-        working-directory: ./infra
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: 1.6.6 }
+      - name: Init & Plan Infra
+        run: |
+          cd infra
+          terraform init -upgrade
+          terraform plan -out=infraplan
+      - name: Apply Infra
+        run: |
+          cd infra
+          terraform apply -auto-approve infraplan
