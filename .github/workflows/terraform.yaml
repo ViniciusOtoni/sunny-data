@@ -45,10 +45,12 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      TF_VAR_subscription_id:   ${{ secrets.ARM_SUBSCRIPTION_ID }}
-      TF_VAR_tenant_id:         ${{ secrets.ARM_TENANT_ID }}
-      TF_VAR_spn_client_id:     ${{ needs.create-spn.outputs.spn_id }}
-      TF_VAR_spn_client_secret: ${{ needs.create-spn.outputs.spn_secret }}
+      TF_VAR_subscription_id:    ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id:          ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_admin_client_id:     ${{ secrets.ARM_CLIENT_ID }}
+      TF_VAR_admin_client_secret: ${{ secrets.ARM_CLIENT_SECRET }}
+      TF_VAR_spn_client_id:       ${{ needs.create-spn.outputs.spn_id }}
+      TF_VAR_spn_client_secret:   ${{ needs.create-spn.outputs.spn_secret }}
 
     steps:
       - uses: actions/checkout@v4
