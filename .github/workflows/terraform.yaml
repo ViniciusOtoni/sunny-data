@@ -11,9 +11,9 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-      TF_VAR_tenant_id:       ${{ secrets.ARM_TENANT_ID }}
-      TF_VAR_admin_client_id: ${{ secrets.ARM_CLIENT_ID }}
+      TF_VAR_subscription_id:     ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id:           ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_admin_client_id:     ${{ secrets.ARM_CLIENT_ID }}
       TF_VAR_admin_client_secret: ${{ secrets.ARM_CLIENT_SECRET }}
 
     steps:
@@ -38,20 +38,17 @@ jobs:
         id: spn
         run: |
           cd infra
-          echo "spn_client_id=$(terraform output -raw spn_client_id)" >> $GITHUB_ENV
-          echo "spn_client_secret=$(terraform output -raw spn_client_secret)" >> $GITHUB_ENV
-
-      - name: Reload Env
-        run: echo "Reloading environment variables for job output"
+          echo "spn_client_id=$(terraform output -raw spn_client_id)" >> $GITHUB_OUTPUT
+          echo "spn_client_secret=$(terraform output -raw spn_client_secret)" >> $GITHUB_OUTPUT
 
       - name: Debug SPN Vars
         run: |
-          echo "spn_client_id: $spn_client_id"
-          echo "spn_client_secret length: ${#spn_client_secret}"
+          echo "SPN ID: ${{ steps.spn.outputs.spn_client_id }}"
+          echo "SPN Secret length: ${{ steps.spn.outputs.spn_client_secret }}"  
 
     outputs:
-      spn_client_id: ${{ env.spn_client_id }}
-      spn_client_secret: ${{ env.spn_client_secret }}
+      spn_client_id:     ${{ steps.spn.outputs.spn_client_id }}
+      spn_client_secret: ${{ steps.spn.outputs.spn_client_secret }}
 
   deploy-infra:
     name: Deploy Remaining Infra
@@ -59,13 +56,13 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # credenciais admin (necessárias para provider azuread.admin)
+      # credenciais admin (provider azuread.admin)
       TF_VAR_subscription_id:     ${{ secrets.ARM_SUBSCRIPTION_ID }}
       TF_VAR_tenant_id:           ${{ secrets.ARM_TENANT_ID }}
       TF_VAR_admin_client_id:     ${{ secrets.ARM_CLIENT_ID }}
       TF_VAR_admin_client_secret: ${{ secrets.ARM_CLIENT_SECRET }}
 
-      # credenciais da SPN criadas no job anterior
+      # credenciais da SPN criada
       TF_VAR_spn_client_id:     ${{ needs.create-spn.outputs.spn_client_id }}
       TF_VAR_spn_client_secret: ${{ needs.create-spn.outputs.spn_client_secret }}
 
