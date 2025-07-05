@@ -12,5 +12,4 @@ output "spn_client_id" {
 
 output "spn_client_secret" {
   value     = azuread_application_password.this.value
-  sensitive = true
 }
