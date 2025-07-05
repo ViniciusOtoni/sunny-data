@@ -18,28 +18,36 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - uses: hashicorp/setup-terraform@v3
-        with: { terraform_version: 1.6.6 }
+        with:
+          terraform_version: 1.6.6
+
       - name: Init & Plan SPN
         run: |
           cd infra
           terraform init
           terraform plan -target=module.service_principal -out=spnplan
+
       - name: Apply SPN
         run: |
           cd infra
           terraform apply -auto-approve spnplan
+
       - name: Capture SPN outputs
         id: spn
         run: |
           cd infra
           echo "spn_client_id=$(terraform output -raw spn_client_id)" >> $GITHUB_ENV
           echo "spn_client_secret=$(terraform output -raw spn_client_secret)" >> $GITHUB_ENV
-          
+
+      - name: Reload Env
+        run: echo "Reloading environment variables for job output"
+
       - name: Debug SPN Vars
         run: |
-          echo "SPN Client ID: $TF_VAR_spn_client_id"
-          echo "SPN Secret length: ${#TF_VAR_spn_client_secret}"
+          echo "spn_client_id: $spn_client_id"
+          echo "spn_client_secret length: ${#spn_client_secret}"
 
     outputs:
       spn_client_id: ${{ env.spn_client_id }}
@@ -51,21 +59,22 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # credenciais admin (ainda necessárias para provider azuread.admin, mesmo que não operem mais)
+      # credenciais admin (necessárias para provider azuread.admin)
       TF_VAR_subscription_id:     ${{ secrets.ARM_SUBSCRIPTION_ID }}
       TF_VAR_tenant_id:           ${{ secrets.ARM_TENANT_ID }}
       TF_VAR_admin_client_id:     ${{ secrets.ARM_CLIENT_ID }}
       TF_VAR_admin_client_secret: ${{ secrets.ARM_CLIENT_SECRET }}
 
-      # **credenciais da SPN** criadas no passo anterior
+      # credenciais da SPN criadas no job anterior
       TF_VAR_spn_client_id:     ${{ needs.create-spn.outputs.spn_client_id }}
       TF_VAR_spn_client_secret: ${{ needs.create-spn.outputs.spn_client_secret }}
 
-
     steps:
       - uses: actions/checkout@v4
+
       - uses: hashicorp/setup-terraform@v3
-        with: { terraform_version: 1.6.6 }
+        with:
+          terraform_version: 1.6.6
 
       - name: Init & Plan Infra
         run: |
