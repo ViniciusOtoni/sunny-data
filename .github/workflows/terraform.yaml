@@ -33,12 +33,12 @@ jobs:
         id: spn
         run: |
           cd infra
-          echo "spn_id=$(terraform output -raw spn_client_id)" >> $GITHUB_OUTPUT
-          echo "spn_secret=$(terraform output -raw client_secret)" >> $GITHUB_OUTPUT
+          echo "spn_client_id=$(terraform output -raw spn_client_id)" >> $GITHUB_OUTPUT
+          echo "spn_client_secret=$(terraform output -raw spn_client_secret)" >> $GITHUB_OUTPUT
 
     outputs:
-      spn_id:     ${{ steps.spn.outputs.spn_id }}
-      spn_secret: ${{ steps.spn.outputs.spn_secret }}
+      spn_client_id:     ${{ steps.spn.outputs.spn_client_id }}
+      spn_client_secret: ${{ steps.spn.outputs.spn_client_secret }}
 
   deploy-infra:
     name: Deploy Remaining Infra
@@ -53,8 +53,8 @@ jobs:
       TF_VAR_admin_client_secret: ${{ secrets.ARM_CLIENT_SECRET }}
 
       # **credenciais da SPN** criadas no passo anterior
-      TF_VAR_spn_client_id:     ${{ needs.create-spn.outputs.spn_id }}
-      TF_VAR_spn_client_secret: ${{ needs.create-spn.outputs.spn_secret }}
+      TF_VAR_spn_client_id:     ${{ needs.create-spn.outputs.spn_client_id }}
+      TF_VAR_spn_client_secret: ${{ needs.create-spn.outputs.spn_client_secret }}
 
 
     steps:

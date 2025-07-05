@@ -10,7 +10,7 @@ output "spn_client_id" {
   value = azuread_service_principal.this.client_id
 }
 
-output "client_secret" {
+output "spn_client_secret" {
   value     = azuread_application_password.this.value
   sensitive = true
 }
