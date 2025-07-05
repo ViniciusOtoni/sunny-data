@@ -37,8 +37,8 @@ jobs:
           echo "spn_secret=$(terraform output -raw client_secret)" >> $GITHUB_OUTPUT
 
     outputs:
-      spn_id: ${{ steps.spn.outputs.client_id }}
-      spn_secret: ${{ steps.spn.outputs.client_secret }}
+      spn_id:     ${{ steps.spn.outputs.spn_id }}
+      spn_secret: ${{ steps.spn.outputs.spn_secret }}
 
   deploy-infra:
     name: Deploy Remaining Infra
