@@ -33,8 +33,8 @@ jobs:
         id: spn
         run: |
           cd infra
-          echo "::set-output name=client_id::$(terraform output -raw spn_client_id)"
-          echo "::set-output name=client_secret::$(terraform output -raw client_secret)"
+          echo "spn_id=$(terraform output -raw spn_client_id)" >> $GITHUB_OUTPUT
+          echo "spn_secret=$(terraform output -raw client_secret)" >> $GITHUB_OUTPUT
 
     outputs:
       spn_id: ${{ steps.spn.outputs.client_id }}
