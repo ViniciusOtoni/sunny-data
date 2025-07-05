@@ -35,6 +35,7 @@ jobs:
           cd infra
           echo "::set-output name=client_id::$(terraform output -raw spn_client_id)"
           echo "::set-output name=client_secret::$(terraform output -raw client_secret)"
+
     outputs:
       spn_id: ${{ steps.spn.outputs.client_id }}
       spn_secret: ${{ steps.spn.outputs.client_secret }}
@@ -45,23 +46,30 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      TF_VAR_subscription_id:    ${{ secrets.ARM_SUBSCRIPTION_ID }}
-      TF_VAR_tenant_id:          ${{ secrets.ARM_TENANT_ID }}
+      # credenciais admin (ainda necessárias para provider azuread.admin, mesmo que não operem mais)
+      TF_VAR_subscription_id:     ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id:           ${{ secrets.ARM_TENANT_ID }}
       TF_VAR_admin_client_id:     ${{ secrets.ARM_CLIENT_ID }}
       TF_VAR_admin_client_secret: ${{ secrets.ARM_CLIENT_SECRET }}
-      TF_VAR_spn_client_id:       ${{ needs.create-spn.outputs.spn_id }}
-      TF_VAR_spn_client_secret:   ${{ needs.create-spn.outputs.spn_secret }}
+
+      # **credenciais da SPN** criadas no passo anterior
+      TF_VAR_spn_client_id:     ${{ needs.create-spn.outputs.spn_id }}
+      TF_VAR_spn_client_secret: ${{ needs.create-spn.outputs.spn_secret }}
+
 
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
         with: { terraform_version: 1.6.6 }
+
       - name: Init & Plan Infra
         run: |
           cd infra
           terraform init -upgrade
           terraform plan -out=infraplan
+
       - name: Apply Infra
+        if: github.ref == 'refs/heads/main'
         run: |
           cd infra
           terraform apply -auto-approve infraplan
