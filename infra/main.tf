@@ -1,0 +1,54 @@
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 3.0"
+    }
+    azuread = {
+      source  = "hashicorp/azuread"
+      version = "~> 2.0"
+    }
+    databricks = {
+      source  = "databricks/databricks"
+      version = "~> 1.0"
+    }
+  }
+}
+
+
+module "service_principal" {
+  source    = "./modules/service_principal"
+  tenant_id = var.tenant_id
+
+  providers = {
+    azuread = azuread.admin
+  }
+}
+
+resource "azurerm_resource_group" "rg_medalforge" {
+  name     = "rg-medalforge"
+  location = "brazilsouth"
+  
+  provider = azurerm.spn
+}
+
+module "storage_account" {
+  source                = "./modules/storage_account"
+  providers             = { azurerm = azurerm.spn }
+  resource_group_name   = azurerm_resource_group.rg_medalforge.name
+  location              = azurerm_resource_group.rg_medalforge.location
+  storage_account_name  = "medalforgestorage"
+  container_name        = "raw"
+}
+
+
+module "databricks_workspace" {
+  source              = "./modules/databricks_workspace"
+  workspace_name      = "medalforge-databricks"
+  location            = azurerm_resource_group.rg_medalforge.location
+  resource_group_name = azurerm_resource_group.rg_medalforge.name
+
+  providers = {
+    azurerm = azurerm.spn
+  }
+}
