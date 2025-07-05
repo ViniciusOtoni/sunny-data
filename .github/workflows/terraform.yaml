@@ -35,20 +35,28 @@ jobs:
           terraform apply -auto-approve spnplan
 
       - name: Capture SPN outputs
-        id: spn
+        id: capture
         run: |
           cd infra
-          echo "spn_client_id=$(terraform output -raw spn_client_id)" >> $GITHUB_OUTPUT
-          echo "spn_client_secret=$(terraform output -raw spn_client_secret)" >> $GITHUB_OUTPUT
+          # captura e mascara o secret
+          SECRET=$(terraform output -raw spn_client_secret)
+          echo "::add-mask::$SECRET"
+          echo "SPN_SECRET=$SECRET" >> $GITHUB_ENV
+          # captura o client_id
+          ID=$(terraform output -raw spn_client_id)
+          echo "SPN_ID=$ID" >> $GITHUB_ENV
+
+      - name: Reload Env
+        run: echo " » env vars reloaded"
 
       - name: Debug SPN Vars
         run: |
-          echo "SPN ID: ${{ steps.spn.outputs.spn_client_id }}"
-          echo "SPN Secret length: ${{ steps.spn.outputs.spn_client_secret }}"  
+          echo "SPN ID: $SPN_ID"
+          echo "SPN Secret length: ${#SPN_SECRET}"
 
     outputs:
-      spn_client_id:     ${{ steps.spn.outputs.spn_client_id }}
-      spn_client_secret: ${{ steps.spn.outputs.spn_client_secret }}
+      spn_client_id:     ${{ env.SPN_ID }}
+      spn_client_secret: ${{ env.SPN_SECRET }}
 
   deploy-infra:
     name: Deploy Remaining Infra

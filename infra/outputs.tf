@@ -12,4 +12,5 @@ output "application_client_id" {
 
 output "spn_client_secret" {
   value     = module.service_principal.spn_client_secret
+  sensitive = true
 }

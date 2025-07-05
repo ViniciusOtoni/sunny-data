@@ -30,4 +30,5 @@ variable "spn_client_id" {
 variable "spn_client_secret" {
   type      = string
   default   = ""
+  sensitive = true
 }
