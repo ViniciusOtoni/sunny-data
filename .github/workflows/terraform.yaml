@@ -29,13 +29,34 @@ jobs:
         with:
           terraform_version: 1.6.6
 
-      - name: Init & Apply SPN + Key Vault
+      - name: Init Terraform
         run: |
           cd infra
           terraform init
-          terraform apply -auto-approve \
+
+      - name: Plan SPN creation
+        run: |
+          cd infra
+          terraform plan \
             -target=module.service_principal \
-            -target=module.key_vault
+            -out=spn.plan
+
+      - name: Apply SPN creation
+        run: |
+          cd infra
+          terraform apply -auto-approve spn.plan
+
+      - name: Plan Key Vault creation
+        run: |
+          cd infra
+          terraform plan \
+            -target=module.key_vault \
+            -out=kv.plan
+
+      - name: Apply Key Vault creation
+        run: |
+          cd infra
+          terraform apply -auto-approve kv.plan
 
   deploy-infra:
     name: 2️⃣ Deploy Remaining Infra
@@ -43,10 +64,10 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      TF_VAR_SUBSCRIPTION_ID:         ${{ secrets.ARM_SUBSCRIPTION_ID }}
-      TF_VAR_TENANT_ID:               ${{ secrets.ARM_TENANT_ID }}
-      TF_VAR_ADMIN_CLIENT_ID:         ${{ secrets.ARM_CLIENT_ID }}
-      TF_VAR_ADMIN_CLIENT_SECRET:     ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_SUBSCRIPTION_ID:       ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      ARM_TENANT_ID:             ${{ secrets.ARM_TENANT_ID }}
+      ARM_CLIENT_ID:             ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET:         ${{ secrets.ARM_CLIENT_SECRET }}
       TF_VAR_BOOTSTRAP_SPN_OBJECT_ID: ${{ secrets.ARM_OBJECT_ID }}
 
     steps:
@@ -65,12 +86,12 @@ jobs:
         id: get_spn
         run: |
           AKV="akv-medalforge-rbac"
-          SPN_ID=$(az keyvault secret show --vault-name $AKV --name spn-client-id --query value -o tsv)
+          SPN_ID=$(az keyvault secret show --vault-name $AKV --name spn-client-id     --query value -o tsv)
           SPN_SECRET=$(az keyvault secret show --vault-name $AKV --name spn-client-secret --query value -o tsv)
           echo "::add-mask::$SPN_SECRET"
-          echo "ARM_CLIENT_ID=$SPN_ID"         >> $GITHUB_ENV
+          echo "ARM_CLIENT_ID=$SPN_ID"       >> $GITHUB_ENV
           echo "ARM_CLIENT_SECRET=$SPN_SECRET" >> $GITHUB_ENV
-          echo "ARM_TENANT_ID=${{ secrets.ARM_TENANT_ID }}"       >> $GITHUB_ENV
+          echo "ARM_TENANT_ID=${{ secrets.ARM_TENANT_ID }}"   >> $GITHUB_ENV
           echo "ARM_SUBSCRIPTION_ID=${{ secrets.ARM_SUBSCRIPTION_ID }}" >> $GITHUB_ENV
 
       - name: Init & Plan Remaining Infra
