@@ -64,11 +64,12 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      ARM_SUBSCRIPTION_ID:       ${{ secrets.ARM_SUBSCRIPTION_ID }}
-      ARM_TENANT_ID:             ${{ secrets.ARM_TENANT_ID }}
-      ARM_CLIENT_ID:             ${{ secrets.ARM_CLIENT_ID }}
-      ARM_CLIENT_SECRET:         ${{ secrets.ARM_CLIENT_SECRET }}
-      TF_VAR_BOOTSTRAP_SPN_OBJECT_ID: ${{ secrets.ARM_OBJECT_ID }}
+      # preciso manter admin para azuread.admin e azurerm.admin/default
+      TF_VAR_admin_client_id:     ${{ secrets.ARM_CLIENT_ID }}
+      TF_VAR_admin_client_secret: ${{ secrets.ARM_CLIENT_SECRET }}
+      TF_VAR_tenant_id:           ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_subscription_id:     ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_bootstrap_spn_object_id: ${{ secrets.ARM_OBJECT_ID }}
 
     steps:
       - uses: actions/checkout@v4
@@ -89,10 +90,9 @@ jobs:
           SPN_ID=$(az keyvault secret show --vault-name $AKV --name spn-client-id     --query value -o tsv)
           SPN_SECRET=$(az keyvault secret show --vault-name $AKV --name spn-client-secret --query value -o tsv)
           echo "::add-mask::$SPN_SECRET"
-          echo "ARM_CLIENT_ID=$SPN_ID"       >> $GITHUB_ENV
-          echo "ARM_CLIENT_SECRET=$SPN_SECRET" >> $GITHUB_ENV
-          echo "ARM_TENANT_ID=${{ secrets.ARM_TENANT_ID }}"   >> $GITHUB_ENV
-          echo "ARM_SUBSCRIPTION_ID=${{ secrets.ARM_SUBSCRIPTION_ID }}" >> $GITHUB_ENV
+          # exporta exatamente as TF_VAR que o provedor spn espera:
+          echo "TF_VAR_spn_client_id=$SPN_ID"     >> $GITHUB_ENV
+          echo "TF_VAR_spn_client_secret=$SPN_SECRET" >> $GITHUB_ENV
 
       - name: Init & Plan Remaining Infra
         run: |
@@ -105,3 +105,4 @@ jobs:
         run: |
           cd infra
           terraform apply -auto-approve infraplan
+          
