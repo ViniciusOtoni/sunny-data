@@ -34,28 +34,6 @@ jobs:
           cd infra
           terraform apply -auto-approve spnplan
 
-      - name: Capture SPN outputs
-        id: capture
-        run: |
-          cd infra
-          SECRET=$(terraform output -raw spn_client_secret)
-          echo "::add-mask::$SECRET"
-          echo "SPN_SECRET=$SECRET" >> $GITHUB_ENV
-          ID=$(terraform output -raw spn_client_id)
-          echo "SPN_ID=$ID" >> $GITHUB_ENV
-
-      - name: Reload Env
-        run: echo " » env vars reloaded"
-
-      - name: Debug SPN Vars
-        run: |
-          echo "SPN ID: $SPN_ID"
-          echo "SPN Secret length: ${#SPN_SECRET}"
-          
-    outputs:
-      spn_client_id:     ${{ env.SPN_ID }}
-      spn_client_secret: ${{ env.SPN_SECRET }}
-
   deploy-infra:
     name: Deploy Remaining Infra
     needs: create-spn
@@ -68,10 +46,6 @@ jobs:
       TF_VAR_admin_client_id:     ${{ secrets.ARM_CLIENT_ID }}
       TF_VAR_admin_client_secret: ${{ secrets.ARM_CLIENT_SECRET }}
 
-      # credenciais da SPN criada
-      TF_VAR_spn_client_id:     ${{ needs.create-spn.outputs.spn_client_id }}
-      TF_VAR_spn_client_secret: ${{ needs.create-spn.outputs.spn_client_secret }}
-
     steps:
       - uses: actions/checkout@v4
 
@@ -79,7 +53,30 @@ jobs:
         with:
           terraform_version: 1.6.6
 
+      - name: Login com Azure CLI (SPN Bootstrap)
+        run: |
+          az login --service-principal \
+            --username "${{ secrets.ARM_CLIENT_ID }}" \
+            --password "${{ secrets.ARM_CLIENT_SECRET }}" \
+            --tenant "${{ secrets.ARM_TENANT_ID }}"
+
+      - name: Buscar Secrets do Azure Key Vault
+        id: get_secrets
+        run: |
+          AKV_NAME="akv-medalforge-rbac"
+          echo " » Buscando secrets no Key Vault: $AKV_NAME"
+          
+          SPN_ID=$(az keyvault secret show --vault-name "$AKV_NAME" --name "spn-client-id" --query "value" -o tsv)
+          SPN_SECRET=$(az keyvault secret show --vault-name "$AKV_NAME" --name "spn-client-secret" --query "value" -o tsv)
+
+          echo "::add-mask::$SPN_SECRET"
+          echo "SPN_ID=$SPN_ID" >> $GITHUB_ENV
+          echo "SPN_SECRET=$SPN_SECRET" >> $GITHUB_ENV
+
       - name: Init & Plan Infra
+        env:
+          TF_VAR_spn_client_id:     ${{ env.SPN_ID }}
+          TF_VAR_spn_client_secret: ${{ env.SPN_SECRET }}
         run: |
           cd infra
           terraform init -upgrade
@@ -87,6 +84,9 @@ jobs:
 
       - name: Apply Infra
         if: github.ref == 'refs/heads/main'
+        env:
+          TF_VAR_spn_client_id:     ${{ env.SPN_ID }}
+          TF_VAR_spn_client_secret: ${{ env.SPN_SECRET }}
         run: |
           cd infra
           terraform apply -auto-approve infraplan

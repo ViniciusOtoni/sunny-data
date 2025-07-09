@@ -22,6 +22,11 @@ variable "admin_client_secret" {
   sensitive   = true
 }
 
+variable "bootstrap_spn_object_id" {
+  description = "Object ID da SPN bootstrap que aplicará secrets no AKV"
+  type        = string
+}
+
 variable "spn_client_id" {
   type    = string
   default = ""

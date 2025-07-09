@@ -32,6 +32,20 @@ resource "azurerm_resource_group" "rg_medalforge" {
   provider = azurerm.spn
 }
 
+
+module "key_vault" {
+  source                  = "./modules/key_vault"
+  name                    = "akv-medalforge-rbac"
+  location                = azurerm_resource_group.rg_medalforge.location
+  resource_group_name     = azurerm_resource_group.rg_medalforge.name
+  tenant_id               = var.tenant_id
+  bootstrap_spn_object_id = var.bootstrap_spn_object_id
+  spn_client_id           = module.service_principal.spn_client_id
+  spn_client_secret       = module.service_principal.spn_client_secret
+  providers               = { azurerm = azurerm.admin }
+}
+
+
 module "storage_account" {
   source                = "./modules/storage_account"
   providers             = { azurerm = azurerm.spn }
