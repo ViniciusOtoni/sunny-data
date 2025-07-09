@@ -15,6 +15,7 @@ jobs:
       TF_VAR_tenant_id:           ${{ secrets.ARM_TENANT_ID }}
       TF_VAR_admin_client_id:     ${{ secrets.ARM_CLIENT_ID }}
       TF_VAR_admin_client_secret: ${{ secrets.ARM_CLIENT_SECRET }}
+      TF_VAR_bootstrap_spn_object_id: ${{ secrets.ARM_OBJECT_ID }}
 
     steps:
       - uses: actions/checkout@v4
@@ -34,17 +35,73 @@ jobs:
           cd infra
           terraform apply -auto-approve spnplan
 
-  deploy-infra:
-    name: Deploy Remaining Infra
+      - name: Capture SPN outputs
+        id: spn_output
+        run: |
+          cd infra
+          SPN_ID=$(terraform output -raw spn_client_id)
+          SPN_SECRET=$(terraform output -raw spn_client_secret)
+          echo "::add-mask::$SPN_SECRET"
+          echo "SPN_ID=$SPN_ID" >> $GITHUB_ENV
+          echo "SPN_SECRET=$SPN_SECRET" >> $GITHUB_ENV
+
+    outputs:
+      spn_client_id:     ${{ env.SPN_ID }}
+      spn_client_secret: ${{ env.SPN_SECRET }}
+
+  create-akv:
+    name: Create Key Vault and Store SPN Secrets
     needs: create-spn
     runs-on: ubuntu-latest
 
     env:
-      # credenciais admin (provider azuread.admin)
       TF_VAR_subscription_id:     ${{ secrets.ARM_SUBSCRIPTION_ID }}
       TF_VAR_tenant_id:           ${{ secrets.ARM_TENANT_ID }}
       TF_VAR_admin_client_id:     ${{ secrets.ARM_CLIENT_ID }}
       TF_VAR_admin_client_secret: ${{ secrets.ARM_CLIENT_SECRET }}
+      TF_VAR_bootstrap_spn_object_id: ${{ secrets.ARM_OBJECT_ID }}
+      TF_VAR_spn_client_id:       ${{ needs.create-spn.outputs.spn_client_id }}
+      TF_VAR_spn_client_secret:   ${{ needs.create-spn.outputs.spn_client_secret }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Init & Apply AKV Module
+        run: |
+          cd infra
+          terraform init
+          terraform apply -target=module.key_vault -auto-approve
+
+      - name: Login com Azure CLI (SPN Bootstrap)
+        run: |
+          az login --service-principal \
+            --username "${{ secrets.ARM_CLIENT_ID }}" \
+            --password "${{ secrets.ARM_CLIENT_SECRET }}" \
+            --tenant "${{ secrets.ARM_TENANT_ID }}"
+
+      - name: Salvar segredos no Key Vault
+        run: |
+          AKV_NAME="akv-medalforge-rbac"
+          echo " » Salvando secrets no Key Vault: $AKV_NAME"
+
+          az keyvault secret set --vault-name "$AKV_NAME" --name "spn-client-id" --value "${{ needs.create-spn.outputs.spn_client_id }}"
+          az keyvault secret set --vault-name "$AKV_NAME" --name "spn-client-secret" --value "${{ needs.create-spn.outputs.spn_client_secret }}"
+
+  deploy-infra:
+    name: Deploy Remaining Infra
+    needs: create-akv
+    runs-on: ubuntu-latest
+
+    env:
+      TF_VAR_subscription_id:     ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id:           ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_admin_client_id:     ${{ secrets.ARM_CLIENT_ID }}
+      TF_VAR_admin_client_secret: ${{ secrets.ARM_CLIENT_SECRET }}
+      TF_VAR_bootstrap_spn_object_id: ${{ secrets.ARM_OBJECT_ID }}
 
     steps:
       - uses: actions/checkout@v4
@@ -64,11 +121,8 @@ jobs:
         id: get_secrets
         run: |
           AKV_NAME="akv-medalforge-rbac"
-          echo " » Buscando secrets no Key Vault: $AKV_NAME"
-          
           SPN_ID=$(az keyvault secret show --vault-name "$AKV_NAME" --name "spn-client-id" --query "value" -o tsv)
           SPN_SECRET=$(az keyvault secret show --vault-name "$AKV_NAME" --name "spn-client-secret" --query "value" -o tsv)
-
           echo "::add-mask::$SPN_SECRET"
           echo "SPN_ID=$SPN_ID" >> $GITHUB_ENV
           echo "SPN_SECRET=$SPN_SECRET" >> $GITHUB_ENV
