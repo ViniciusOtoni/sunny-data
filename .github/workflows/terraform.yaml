@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      TF_VAR_subscription_id:     ${{ secrets.ARM_SUBSCRIPTION_ID }}
-      TF_VAR_tenant_id:           ${{ secrets.ARM_TENANT_ID }}
-      TF_VAR_admin_client_id:     ${{ secrets.ARM_CLIENT_ID }}
-      TF_VAR_admin_client_secret: ${{ secrets.ARM_CLIENT_SECRET }}
+      TF_VAR_subscription_id:         ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id:               ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_admin_client_id:         ${{ secrets.ARM_CLIENT_ID }}
+      TF_VAR_admin_client_secret:     ${{ secrets.ARM_CLIENT_SECRET }}
       TF_VAR_bootstrap_spn_object_id: ${{ secrets.ARM_OBJECT_ID }}
 
     steps:
@@ -24,43 +24,22 @@ jobs:
         with:
           terraform_version: 1.6.6
 
-      # 1) Cria SPN e Key Vault
       - name: Init & Apply SPN + Key Vault
         run: |
           cd infra
           terraform init
-          # aplica SPN e KV juntos
-          terraform apply -auto-approve -target=module.service_principal -target=module.key_vault
-
-      # 2) Captura os outputs da SPN **dentro deste job somente**
-      - name: Capture SPN outputs
-        run: |
-          cd infra
-          SPN_ID=$(terraform output -raw spn_client_id)
-          SPN_SECRET=$(terraform output -raw spn_client_secret)
-          echo "::add-mask::$SPN_SECRET"
-
-          # login com a SPN bootstrap/admin
-          az login --service-principal \
-            --username "${{ secrets.ARM_CLIENT_ID }}" \
-            --password "${{ secrets.ARM_CLIENT_SECRET }}" \
-            --tenant "${{ secrets.ARM_TENANT_ID }}"
-
-          # grava direto no Key Vault
-          AKV_NAME="akv-medalforge-rbac"
-          az keyvault secret set --vault-name "$AKV_NAME" --name "spn-client-id"     --value "$SPN_ID"
-          az keyvault secret set --vault-name "$AKV_NAME" --name "spn-client-secret" --value "$SPN_SECRET"
+          terraform apply -target=module.service_principal -target=module.key_vault -auto-approve
 
   deploy-infra:
-    name: 2️⃣ Deploy Remaining Infra
+    name: 2️⃣ Deploy Infra com SPN via AKV
     needs: bootstrap
     runs-on: ubuntu-latest
 
     env:
-      TF_VAR_subscription_id:     ${{ secrets.ARM_SUBSCRIPTION_ID }}
-      TF_VAR_tenant_id:           ${{ secrets.ARM_TENANT_ID }}
-      TF_VAR_admin_client_id:     ${{ secrets.ARM_CLIENT_ID }}
-      TF_VAR_admin_client_secret: ${{ secrets.ARM_CLIENT_SECRET }}
+      TF_VAR_subscription_id:         ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id:               ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_admin_client_id:         ${{ secrets.ARM_CLIENT_ID }}
+      TF_VAR_admin_client_secret:     ${{ secrets.ARM_CLIENT_SECRET }}
       TF_VAR_bootstrap_spn_object_id: ${{ secrets.ARM_OBJECT_ID }}
 
     steps:
@@ -71,36 +50,41 @@ jobs:
           terraform_version: 1.6.6
 
       - name: Login com Azure CLI (SPN Bootstrap)
-        run: |
-          az login --service-principal \
-            --username "${{ secrets.ARM_CLIENT_ID }}" \
-            --password "${{ secrets.ARM_CLIENT_SECRET }}" \
-            --tenant "${{ secrets.ARM_TENANT_ID }}"
+        uses: azure/login@v2
+        with:
+          client-id:       ${{ secrets.ARM_CLIENT_ID }}
+          tenant-id:       ${{ secrets.ARM_TENANT_ID }}
+          client-secret:   ${{ secrets.ARM_CLIENT_SECRET }}
+          subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
 
-      - name: Fetch SPN secrets from Key Vault
+      - name: Buscar SPN do AKV e autenticar como SPN dinâmica
         id: get_secrets
         run: |
+          echo "🔐 Buscando secrets do Key Vault..."
           AKV_NAME="akv-medalforge-rbac"
-          SPN_ID=$(az keyvault secret show --vault-name "$AKV_NAME" --name "spn-client-id"     --query value -o tsv)
-          SPN_SECRET=$(az keyvault secret show --vault-name "$AKV_NAME" --name "spn-client-secret" --query value -o tsv)
+          SPN_ID=$(az keyvault secret show --vault-name "$AKV_NAME" --name "spn-client-id" --query "value" -o tsv)
+          SPN_SECRET=$(az keyvault secret show --vault-name "$AKV_NAME" --name "spn-client-secret" --query "value" -o tsv)
+
           echo "::add-mask::$SPN_SECRET"
-          echo "SPN_ID=$SPN_ID"     >> $GITHUB_ENV
+          echo "SPN_ID=$SPN_ID" >> $GITHUB_ENV
           echo "SPN_SECRET=$SPN_SECRET" >> $GITHUB_ENV
 
-      - name: Init & Plan Remaining Infra
-        env:
-          TF_VAR_spn_client_id:     ${{ env.SPN_ID }}
-          TF_VAR_spn_client_secret: ${{ env.SPN_SECRET }}
+      - name: Autenticar com a SPN dinâmica (via azure/login)
+        uses: azure/login@v2
+        with:
+          client-id:       ${{ env.SPN_ID }}
+          tenant-id:       ${{ secrets.ARM_TENANT_ID }}
+          client-secret:   ${{ env.SPN_SECRET }}
+          subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+      - name: Init & Plan Infra com SPN dinâmica
         run: |
           cd infra
           terraform init -upgrade
           terraform plan -out=infraplan
 
-      - name: Apply Remaining Infra
+      - name: Apply Infra
         if: github.ref == 'refs/heads/main'
-        env:
-          TF_VAR_spn_client_id:     ${{ env.SPN_ID }}
-          TF_VAR_spn_client_secret: ${{ env.SPN_SECRET }}
         run: |
           cd infra
           terraform apply -auto-approve infraplan
