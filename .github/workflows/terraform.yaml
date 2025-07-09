@@ -18,15 +18,12 @@ jobs:
       TF_VAR_BOOTSTRAP_SPN_OBJECT_ID: ${{ secrets.ARM_OBJECT_ID }}
 
     steps:
-      - name: Login com Azure CLI (SPN Bootstrap)
+      - uses: actions/checkout@v4
+
+      - name: Azure Login (SPN Bootstrap)
         uses: azure/login@v2
         with:
-          client-id:       ${{ secrets.ARM_CLIENT_ID }}
-          tenant-id:       ${{ secrets.ARM_TENANT_ID }}
-          client-secret:   ${{ secrets.ARM_CLIENT_SECRET }}
-          subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-
-      - uses: actions/checkout@v4
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -55,17 +52,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Azure Login (SPN Bootstrap)
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.6
-
-      - name: Login com Azure CLI (SPN Bootstrap)
-        uses: azure/login@v2
-        with:
-          client-id:       ${{ secrets.ARM_CLIENT_ID }}
-          tenant-id:       ${{ secrets.ARM_TENANT_ID }}
-          client-secret:   ${{ secrets.ARM_CLIENT_SECRET }}
-          subscription-id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
 
       - name: Fetch SPN credentials from AKV
         id: get_spn
@@ -74,9 +68,9 @@ jobs:
           SPN_ID=$(az keyvault secret show --vault-name $AKV --name spn-client-id --query value -o tsv)
           SPN_SECRET=$(az keyvault secret show --vault-name $AKV --name spn-client-secret --query value -o tsv)
           echo "::add-mask::$SPN_SECRET"
-          echo "ARM_CLIENT_ID=$SPN_ID"       >> $GITHUB_ENV
+          echo "ARM_CLIENT_ID=$SPN_ID"         >> $GITHUB_ENV
           echo "ARM_CLIENT_SECRET=$SPN_SECRET" >> $GITHUB_ENV
-          echo "ARM_TENANT_ID=${{ secrets.ARM_TENANT_ID }}"   >> $GITHUB_ENV
+          echo "ARM_TENANT_ID=${{ secrets.ARM_TENANT_ID }}"       >> $GITHUB_ENV
           echo "ARM_SUBSCRIPTION_ID=${{ secrets.ARM_SUBSCRIPTION_ID }}" >> $GITHUB_ENV
 
       - name: Init & Plan Remaining Infra
