@@ -25,6 +25,15 @@ module "service_principal" {
   }
 }
 
+data "azurerm_subscription" "primary" {}
+
+resource "azurerm_role_assignment" "spn_contributor" {
+  provider             = azurerm.admin
+  scope                = data.azurerm_subscription.primary.id
+  role_definition_name = "Contributor"                # ou "Reader", se só precisar ler providers
+  principal_id         = module.service_principal.spn_object_id
+}
+
 resource "azurerm_resource_group" "rg_medalforge" {
   name     = "rg-medalforge"
   location = "brazilsouth"
