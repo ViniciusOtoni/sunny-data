@@ -15,6 +15,7 @@ jobs:
       TF_VAR_tenant_id:               ${{ secrets.ARM_TENANT_ID }}
       TF_VAR_admin_client_id:         ${{ secrets.ARM_CLIENT_ID }}
       TF_VAR_admin_client_secret:     ${{ secrets.ARM_CLIENT_SECRET }}
+      TF_VAR_bootstrap_spn_object_id: ${{ secrets.ARM_OBJECT_ID }}
 
     steps:
       - uses: actions/checkout@v4
