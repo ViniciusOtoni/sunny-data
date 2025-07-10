@@ -25,6 +25,13 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Register Resource Providers
+        run: |
+          echo "🔄 Registrando namespaces de Resource Providers..."
+          az provider register --namespace Microsoft.Resources
+          az provider register --namespace Microsoft.Storage
+          az provider register --namespace Microsoft.Databricks
+
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.6
@@ -64,11 +71,11 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # preciso manter admin para azuread.admin e azurerm.admin/default
-      TF_VAR_admin_client_id:     ${{ secrets.ARM_CLIENT_ID }}
-      TF_VAR_admin_client_secret: ${{ secrets.ARM_CLIENT_SECRET }}
-      TF_VAR_tenant_id:           ${{ secrets.ARM_TENANT_ID }}
-      TF_VAR_subscription_id:     ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      # admin para provider azuread.admin/azurerm.admin
+      TF_VAR_admin_client_id:         ${{ secrets.ARM_CLIENT_ID }}
+      TF_VAR_admin_client_secret:     ${{ secrets.ARM_CLIENT_SECRET }}
+      TF_VAR_tenant_id:               ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_subscription_id:         ${{ secrets.ARM_SUBSCRIPTION_ID }}
       TF_VAR_bootstrap_spn_object_id: ${{ secrets.ARM_OBJECT_ID }}
 
     steps:
@@ -91,7 +98,7 @@ jobs:
           SPN_SECRET=$(az keyvault secret show --vault-name $AKV --name spn-client-secret --query value -o tsv)
           echo "::add-mask::$SPN_SECRET"
           # exporta exatamente as TF_VAR que o provedor spn espera:
-          echo "TF_VAR_spn_client_id=$SPN_ID"     >> $GITHUB_ENV
+          echo "TF_VAR_spn_client_id=$SPN_ID"       >> $GITHUB_ENV
           echo "TF_VAR_spn_client_secret=$SPN_SECRET" >> $GITHUB_ENV
 
       - name: Init & Plan Remaining Infra
@@ -105,4 +112,3 @@ jobs:
         run: |
           cd infra
           terraform apply -auto-approve infraplan
-          
