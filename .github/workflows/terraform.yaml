@@ -41,17 +41,21 @@ jobs:
           cd infra
           terraform init
 
-      - name: Plan SPN creation
+      - name: Plan SPN creation + Role Assignments
         run: |
           cd infra
           terraform plan \
             -target=module.service_principal \
-            -out=spn.plan
+            -target=azurerm_role_assignment.spn_contributor_rg \
+            -target=azurerm_role_assignment.spn_reader_subscription \
+            -out=spn_roles.plan
 
-      - name: Apply SPN creation
+      - name: Apply SPN creation + Role Assignments
         run: |
           cd infra
           terraform apply -auto-approve spn.plan
+          terraform apply -auto-approve spn_roles.plan
+
 
       - name: Plan Key Vault creation
         run: |
