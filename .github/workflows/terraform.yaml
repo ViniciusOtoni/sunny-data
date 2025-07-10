@@ -6,8 +6,49 @@ on:
   workflow_dispatch: {}
 
 jobs:
+  create-rgs:
+    name: 0️⃣ Criar Resource Groups
+    runs-on: ubuntu-latest
+
+    env:
+      TF_VAR_subscription_id:         ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id:               ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_admin_client_id:         ${{ secrets.ARM_CLIENT_ID }}
+      TF_VAR_admin_client_secret:     ${{ secrets.ARM_CLIENT_SECRET }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login (Admin SPN)
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Init Terraform
+        run: |
+          cd infra
+          terraform init
+
+      - name: Plan Resource Groups
+        run: |
+          cd infra
+          terraform plan \
+            -target=azurerm_resource_group.rg_core \
+            -target=azurerm_resource_group.rg_datalake \
+            -out=rgs.plan
+
+      - name: Apply Resource Groups
+        run: |
+          cd infra
+          terraform apply -auto-approve rgs.plan
+
   bootstrap:
-    name: 1️⃣ Bootstrap SPN + AKV + Store Secrets
+    name: 1️⃣ Bootstrap SPN + Role Assignments + AKV
+    needs: create-rgs
     runs-on: ubuntu-latest
 
     env:
@@ -20,7 +61,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Azure Login (SPN Bootstrap)
+      - name: Azure Login (Admin SPN)
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
@@ -40,19 +81,17 @@ jobs:
           cd infra
           terraform init
 
-      - name: Plan SPN + Role Assignments + Key Vault
+      - name: Plan SPN + Role Assignments + AKV
         run: |
           cd infra
           terraform plan \
             -target=module.service_principal \
-            -target=azurerm_resource_group.rg_core \
-            -target=azurerm_resource_group.rg_datalake \
             -target=azurerm_role_assignment.spn_contributor_datalake \
             -target=azurerm_role_assignment.spn_reader_subscription \
             -target=module.key_vault \
             -out=bootstrap.plan
 
-      - name: Apply SPN + Role Assignments + Key Vault
+      - name: Apply SPN + Role Assignments + AKV
         run: |
           cd infra
           terraform apply -auto-approve bootstrap.plan
@@ -72,7 +111,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Azure Login (SPN Bootstrap)
+      - name: Azure Login (Admin SPN)
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
@@ -88,7 +127,7 @@ jobs:
           SPN_ID=$(az keyvault secret show --vault-name $AKV --name spn-client-id --query value -o tsv)
           SPN_SECRET=$(az keyvault secret show --vault-name $AKV --name spn-client-secret --query value -o tsv)
           echo "::add-mask::$SPN_SECRET"
-          echo "TF_VAR_spn_client_id=$SPN_ID"       >> $GITHUB_ENV
+          echo "TF_VAR_spn_client_id=$SPN_ID"         >> $GITHUB_ENV
           echo "TF_VAR_spn_client_secret=$SPN_SECRET" >> $GITHUB_ENV
 
       - name: Init & Plan Remaining Infra
