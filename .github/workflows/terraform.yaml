@@ -95,7 +95,7 @@ jobs:
       - name: Fetch SPN credentials from AKV
         id: get_spn
         run: |
-          AKV="akv-medalforge-rbac"
+          AKV="akv-medalforge-rbac-core"
           SPN_ID=$(az keyvault secret show --vault-name $AKV --name spn-client-id     --query value -o tsv)
           SPN_SECRET=$(az keyvault secret show --vault-name $AKV --name spn-client-secret --query value -o tsv)
           echo "::add-mask::$SPN_SECRET"
