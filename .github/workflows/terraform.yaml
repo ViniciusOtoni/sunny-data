@@ -27,7 +27,6 @@ jobs:
 
       - name: Register Resource Providers
         run: |
-          echo "🔄 Registrando namespaces de Resource Providers..."
           az provider register --namespace Microsoft.Resources
           az provider register --namespace Microsoft.Storage
           az provider register --namespace Microsoft.Databricks
@@ -41,31 +40,22 @@ jobs:
           cd infra
           terraform init
 
-      - name: Plan SPN creation + Role Assignments
+      - name: Plan SPN + Role Assignments + Key Vault
         run: |
           cd infra
           terraform plan \
             -target=module.service_principal \
+            -target=azurerm_resource_group.rg_core \
+            -target=azurerm_resource_group.rg_datalake \
             -target=azurerm_role_assignment.spn_contributor_datalake \
             -target=azurerm_role_assignment.spn_reader_subscription \
-            -out=spn.plan
-
-      - name: Apply SPN creation + Role Assignments
-        run: |
-          cd infra
-          terraform apply -auto-approve spn.plan
-
-      - name: Plan Key Vault creation
-        run: |
-          cd infra
-          terraform plan \
             -target=module.key_vault \
-            -out=kv.plan
+            -out=bootstrap.plan
 
-      - name: Apply Key Vault creation
+      - name: Apply SPN + Role Assignments + Key Vault
         run: |
           cd infra
-          terraform apply -auto-approve kv.plan
+          terraform apply -auto-approve bootstrap.plan
 
   deploy-infra:
     name: 2️⃣ Deploy Remaining Infra
@@ -73,7 +63,6 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # admin para provider azuread.admin/azurerm.admin
       TF_VAR_admin_client_id:         ${{ secrets.ARM_CLIENT_ID }}
       TF_VAR_admin_client_secret:     ${{ secrets.ARM_CLIENT_SECRET }}
       TF_VAR_tenant_id:               ${{ secrets.ARM_TENANT_ID }}
@@ -96,10 +85,9 @@ jobs:
         id: get_spn
         run: |
           AKV="akv-medalforge-rbac-core"
-          SPN_ID=$(az keyvault secret show --vault-name $AKV --name spn-client-id     --query value -o tsv)
+          SPN_ID=$(az keyvault secret show --vault-name $AKV --name spn-client-id --query value -o tsv)
           SPN_SECRET=$(az keyvault secret show --vault-name $AKV --name spn-client-secret --query value -o tsv)
           echo "::add-mask::$SPN_SECRET"
-          # exporta exatamente as TF_VAR que o provedor spn espera:
           echo "TF_VAR_spn_client_id=$SPN_ID"       >> $GITHUB_ENV
           echo "TF_VAR_spn_client_secret=$SPN_SECRET" >> $GITHUB_ENV
 
