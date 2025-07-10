@@ -15,6 +15,7 @@ terraform {
   }
 }
 
+# Módulo para criar a SPN
 
 module "service_principal" {
   source    = "./modules/service_principal"
@@ -25,19 +26,27 @@ module "service_principal" {
   }
 }
 
-resource "azurerm_resource_group" "rg_medalforge" {
-  name     = "rg-medalforge"
+# RG para recursos persistentes
+resource "azurerm_resource_group" "rg_core" {
+  name     = "rg-medalforge-core"
   location = "brazilsouth"
-  
   provider = azurerm.spn
 }
 
+# RG para infraestrutura do projeto
+resource "azurerm_resource_group" "rg_datalake" {
+  name     = "rg-medalforge-datalake"
+  location = "brazilsouth"
+  provider = azurerm.spn
+}
+
+# Subscription atual
 data "azurerm_subscription" "primary" {}
 
-
-resource "azurerm_role_assignment" "spn_contributor_rg" {
+# Permissões para a SPN 
+resource "azurerm_role_assignment" "spn_contributor_datalake" {
   provider             = azurerm.admin
-  scope                = azurerm_resource_group.rg_medalforge.id
+  scope                = azurerm_resource_group.rg_datalake.id
   role_definition_name = "Contributor"
   principal_id         = module.service_principal.spn_object_id
 }
@@ -49,12 +58,12 @@ resource "azurerm_role_assignment" "spn_reader_subscription" {
   principal_id         = module.service_principal.spn_object_id
 }
 
-
+# Key Vault no RG Core
 module "key_vault" {
   source                  = "./modules/key_vault"
   name                    = "akv-medalforge-rbac"
-  location                = azurerm_resource_group.rg_medalforge.location
-  resource_group_name     = azurerm_resource_group.rg_medalforge.name
+  location                = azurerm_resource_group.rg_core.location
+  resource_group_name     = azurerm_resource_group.rg_core.name
   tenant_id               = var.tenant_id
   bootstrap_spn_object_id = var.bootstrap_spn_object_id
   spn_client_id           = module.service_principal.spn_client_id
@@ -62,22 +71,22 @@ module "key_vault" {
   providers               = { azurerm = azurerm.admin }
 }
 
-
+# Storage Account no RG Datalake
 module "storage_account" {
   source                = "./modules/storage_account"
   providers             = { azurerm = azurerm.spn }
-  resource_group_name   = azurerm_resource_group.rg_medalforge.name
-  location              = azurerm_resource_group.rg_medalforge.location
+  resource_group_name   = azurerm_resource_group.rg_datalake.name
+  location              = azurerm_resource_group.rg_datalake.location
   storage_account_name  = "medalforgestorage"
   container_name        = "raw"
 }
 
-
+# Databricks Workspace no RG Datalake
 module "databricks_workspace" {
   source              = "./modules/databricks_workspace"
   workspace_name      = "medalforge-databricks"
-  location            = azurerm_resource_group.rg_medalforge.location
-  resource_group_name = azurerm_resource_group.rg_medalforge.name
+  location            = azurerm_resource_group.rg_datalake.location
+  resource_group_name = azurerm_resource_group.rg_datalake.name
 
   providers = {
     azurerm = azurerm.spn
