@@ -54,8 +54,6 @@ jobs:
         run: |
           cd infra
           terraform apply -auto-approve spn.plan
-          terraform apply -auto-approve spn_roles.plan
-
 
       - name: Plan Key Vault creation
         run: |
