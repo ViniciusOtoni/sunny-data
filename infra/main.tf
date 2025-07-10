@@ -32,6 +32,9 @@ resource "azurerm_resource_group" "rg_medalforge" {
   provider = azurerm.spn
 }
 
+data "azurerm_subscription" "primary" {}
+
+
 resource "azurerm_role_assignment" "spn_contributor_rg" {
   provider             = azurerm.admin
   scope                = azurerm_resource_group.rg_medalforge.id
@@ -41,7 +44,7 @@ resource "azurerm_role_assignment" "spn_contributor_rg" {
 
 resource "azurerm_role_assignment" "spn_reader_subscription" {
   provider             = azurerm.admin
-  scope                = var.subscription_id
+  scope                = data.azurerm_subscription.primary.id
   role_definition_name = "Reader"
   principal_id         = module.service_principal.spn_object_id
 }
