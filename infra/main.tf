@@ -61,7 +61,7 @@ resource "azurerm_role_assignment" "spn_reader_subscription" {
 # Key Vault no RG Core
 module "key_vault" {
   source                  = "./modules/key_vault"
-  name                    = "akv-medalforge-rbac"
+  name                    = "akv-medalforge-rbac-core"
   location                = azurerm_resource_group.rg_core.location
   resource_group_name     = azurerm_resource_group.rg_core.name
   tenant_id               = var.tenant_id
