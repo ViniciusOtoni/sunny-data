@@ -30,14 +30,14 @@ module "service_principal" {
 resource "azurerm_resource_group" "rg_core" {
   name     = "rg-medalforge-core"
   location = "brazilsouth"
-  provider = azurerm.spn
+  provider = azurerm.admin
 }
 
 # RG para infraestrutura do projeto
 resource "azurerm_resource_group" "rg_datalake" {
   name     = "rg-medalforge-datalake"
   location = "brazilsouth"
-  provider = azurerm.spn
+  provider = azurerm.admin
 }
 
 # Subscription atual

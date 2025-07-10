@@ -46,7 +46,7 @@ jobs:
           cd infra
           terraform plan \
             -target=module.service_principal \
-            -target=azurerm_role_assignment.spn_contributor_rg \
+            -target=azurerm_role_assignment.spn_contributor_datalake \
             -target=azurerm_role_assignment.spn_reader_subscription \
             -out=spn.plan
 
