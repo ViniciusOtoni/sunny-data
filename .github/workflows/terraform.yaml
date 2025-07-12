@@ -162,7 +162,6 @@ jobs:
 
       - name: Plan & Apply Remaining Infra
         run: |
-          cd infra
           terraform -chdir=infra plan \
             -target=module.storage_for_uc \
             -target=module.storage_for_lake \
