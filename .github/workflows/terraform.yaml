@@ -163,13 +163,14 @@ jobs:
       - name: Plan & Apply Remaining Infra
         run: |
           cd infra
-          terraform plan \
+          terraform -chdir=infra plan \
             -target=module.storage_for_uc \
             -target=module.storage_for_lake \
-            -target=module.workspace_create \ 
+            -target=module.workspace_create \
             -out=infraplan
-          terraform apply -auto-approve infraplan
-          
+
+          terraform -chdir=infra apply -auto-approve infraplan
+      
       - name: Upload Terraform State
         uses: actions/upload-artifact@v4
         with:
