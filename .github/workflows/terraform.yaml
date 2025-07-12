@@ -176,12 +176,18 @@ jobs:
             --assignee "$OWNER_ID" \
             --role "Databricks Workspace Admin" \
             --scope "$WORKSPACE_ID"
+          
+      - name: Upload Terraform State
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfstate-deployment
+          path: infra/terraform.tfstate
 
 
   destroy-infra:
     name: 🧨 Destroy Infra (manual)
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' 
+    if: github.event_name == 'workflow_dispatch'
 
     env:
       TF_VAR_subscription_id:         ${{ secrets.ARM_SUBSCRIPTION_ID }}
@@ -192,6 +198,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download Terraform State
+        uses: actions/download-artifact@v4
+        with:
+          name: tfstate-deployment
+          path: infra/
 
       - name: Azure Login (Admin SPN)
         uses: azure/login@v2

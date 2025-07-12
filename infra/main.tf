@@ -86,7 +86,7 @@ module "storage_for_uc" {
   resource_group_name  = azurerm_resource_group.rg_datalake.name
   location             = azurerm_resource_group.rg_datalake.location
   storage_account_name = "medalforgedatabricks"
-  container_name       = ["uc-root"]    
+  container_names       = ["uc-root"]    
 
   providers = {
     azurerm = azurerm.spn
