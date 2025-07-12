@@ -47,6 +47,12 @@ jobs:
           cd infra
           terraform apply -auto-approve rgs.plan
 
+      - name: Upload Terraform State
+        uses: actions/upload-artifact@v3
+        with:
+          name: tfstate
+          path: infra/terraform.tfstate
+
   bootstrap:
     name: 1️⃣ Bootstrap SPN + Role Assignments + AKV
     needs: create-rgs
@@ -61,6 +67,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download Terraform State
+        uses: actions/download-artifact@v3
+        with:
+          name: tfstate
+          path: infra/
 
       - name: Azure Login (Admin SPN)
         uses: azure/login@v2
@@ -97,6 +109,12 @@ jobs:
           cd infra
           terraform apply -auto-approve bootstrap.plan
 
+      - name: Upload Terraform State
+        uses: actions/upload-artifact@v3
+        with:
+          name: tfstate
+          path: infra/terraform.tfstate
+
   deploy-infra:
     name: 2️⃣ Deploy Remaining Infra
     needs: bootstrap
@@ -112,6 +130,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Download Terraform State
+        uses: actions/download-artifact@v3
+        with:
+          name: tfstate
+          path: infra/
+
       - name: Azure Login (Admin SPN)
         uses: azure/login@v2
         with:
@@ -120,6 +144,11 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.6
+
+      - name: Init Terraform
+        run: |
+          cd infra
+          terraform init
 
       - name: Fetch SPN credentials from AKV
         id: get_spn
@@ -131,14 +160,8 @@ jobs:
           echo "TF_VAR_spn_client_id=$SPN_ID"         >> $GITHUB_ENV
           echo "TF_VAR_spn_client_secret=$SPN_SECRET" >> $GITHUB_ENV
 
-      - name: Init & Plan Remaining Infra
+      - name: Plan & Apply Remaining Infra
         run: |
           cd infra
-          terraform init -upgrade
           terraform plan -out=infraplan
-
-      - name: Apply Remaining Infra
-        if: github.ref == 'refs/heads/main'
-        run: |
-          cd infra
           terraform apply -auto-approve infraplan
