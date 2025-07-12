@@ -11,21 +11,6 @@ terraform {
   }
 }
 
-# Unity Catalog Metastore
-resource "databricks_metastore" "uc" {
-  provider                     = databricks.spn
-  name                         = var.metastore_name
-  storage_root                 = var.uc_storage_root
-  storage_root_credential_name = var.uc_storage_credential_name
-}
-
-resource "databricks_metastore_assignment" "attach" {
-  provider     = databricks.spn
-  workspace_id = var.workspace_id
-  metastore_id = databricks_metastore.uc.id
-
-  depends_on = [ databricks_metastore.uc ]
-}
 
 # Storage Credential
 resource "databricks_storage_credential" "this" {
@@ -38,6 +23,24 @@ resource "databricks_storage_credential" "this" {
     directory_id       = var.tenant_id
   }
 }
+
+# Unity Catalog Metastore
+resource "databricks_metastore" "uc" {
+  provider                     = databricks.spn
+  name                         = var.metastore_name
+  storage_root                 = var.uc_storage_root
+  storage_root_credential_id   = databricks_storage_credential.this.id
+}
+
+resource "databricks_metastore_assignment" "attach" {
+  provider     = databricks.spn
+  workspace_id = var.workspace_id
+  metastore_id = databricks_metastore.uc.id
+
+  depends_on = [ databricks_metastore.uc ]
+}
+
+
 
 # External Locations
 resource "databricks_external_location" "bronze" {

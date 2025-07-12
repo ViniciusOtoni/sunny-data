@@ -9,10 +9,6 @@ variable "uc_storage_root" {
     type = string 
 }
 
-variable "uc_storage_credential_name" { 
-    type = string 
-}
-
 variable "spn_client_id" { 
     type        = string 
     sensitive   = true
