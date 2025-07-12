@@ -50,7 +50,7 @@ jobs:
       - name: Upload Terraform State
         uses: actions/upload-artifact@v4
         with:
-          name: tfstate
+          name: tfstate-create
           path: infra/terraform.tfstate
 
   bootstrap:
@@ -71,7 +71,7 @@ jobs:
       - name: Download Terraform State
         uses: actions/download-artifact@v4
         with:
-          name: tfstate
+          name: tfstate-create
           path: infra/
 
       - name: Azure Login (Admin SPN)
@@ -112,7 +112,7 @@ jobs:
       - name: Upload Terraform State
         uses: actions/upload-artifact@v4
         with:
-          name: tfstate
+          name: tfstate-bootstrap
           path: infra/terraform.tfstate
 
   deploy-infra:
@@ -133,7 +133,7 @@ jobs:
       - name: Download Terraform State
         uses: actions/download-artifact@v4
         with:
-          name: tfstate
+          name: tfstate-bootstrap
           path: infra/
 
       - name: Azure Login (Admin SPN)
