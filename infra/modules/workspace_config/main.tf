@@ -1,3 +1,12 @@
+terraform {
+  required_providers {
+    databricks = {
+      source  = "databricks/databricks"
+      version = "~> 1.0"
+    }
+  }
+}
+
 # Storage Credential
 resource "databricks_storage_credential" "this" {
   provider = databricks.spn
