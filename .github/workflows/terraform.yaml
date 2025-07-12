@@ -25,7 +25,7 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - uses: hashicorp/setup-terraform@v
+      - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.6
 
