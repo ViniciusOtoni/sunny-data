@@ -23,15 +23,6 @@ provider "azurerm" {
   features {}
 }
 
-provider "databricks" {
-  alias                       = "spn"
-  azure_workspace_resource_id = module.workspace_create.workspace_id
-  azure_client_id             = module.service_principal.spn_client_id
-  azure_client_secret         = module.service_principal.spn_client_secret
-  azure_tenant_id             = var.tenant_id
-}
-
-
 # Azure AD provider para criar a SPN
 provider "azuread" {
   alias     = "admin"

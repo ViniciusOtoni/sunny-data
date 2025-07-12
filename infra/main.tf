@@ -141,7 +141,4 @@ module "workspace_config" {
   silver_url = "abfss://silver@${module.storage_for_lake.storage_account_name}.dfs.core.windows.net/"
   gold_url   = "abfss://gold@${module.storage_for_lake.storage_account_name}.dfs.core.windows.net/"
 
-  providers = {
-    databricks = databricks.spn
-  }
 }
