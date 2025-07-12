@@ -165,3 +165,59 @@ jobs:
           cd infra
           terraform plan -out=infraplan
           terraform apply -auto-approve infraplan
+
+      - name: 🔒 Remover Owner como Admin da Workspace
+        run: |
+          # ID do Owner
+          OWNER_ID=${{ secrets.ARM_OWNER_ID }}
+          
+          WORKSPACE_ID=$(terraform output -raw workspace_id)
+          az role assignment delete \
+            --assignee "$OWNER_ID" \
+            --role "Databricks Workspace Admin" \
+            --scope "$WORKSPACE_ID"
+
+
+  destroy-infra:
+    name: 🧨 Destroy Infra (manual)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' 
+
+    env:
+      TF_VAR_subscription_id:         ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id:               ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_admin_client_id:         ${{ secrets.ARM_CLIENT_ID }}
+      TF_VAR_admin_client_secret:     ${{ secrets.ARM_CLIENT_SECRET }}
+      TF_VAR_bootstrap_spn_object_id: ${{ secrets.ARM_OBJECT_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login (Admin SPN)
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Init Terraform
+        run: |
+          cd infra
+          terraform init
+
+      - name: Fetch SPN credentials from AKV
+        id: get_spn
+        run: |
+          AKV="akv-medalforge-rbac-core"
+          SPN_ID=$(az keyvault secret show --vault-name $AKV --name spn-client-id --query value -o tsv)
+          SPN_SECRET=$(az keyvault secret show --vault-name $AKV --name spn-client-secret --query value -o tsv)
+          echo "::add-mask::$SPN_SECRET"
+          echo "TF_VAR_spn_client_id=$SPN_ID"         >> $GITHUB_ENV
+          echo "TF_VAR_spn_client_secret=$SPN_SECRET" >> $GITHUB_ENV
+
+      - name: Destroy Infra
+        run: |
+          cd infra
+          terraform destroy -auto-approve

@@ -13,7 +13,7 @@ variable "storage_account_name" {
   description = "Nome do Storage Account"
 }
 
-variable "container_name" {
-  type        = string
-  description = "Nome do container dentro do Storage Account"
+variable "container_names" {
+  type        = list(string)
+  description = "Lista de containers a serem criados"
 }

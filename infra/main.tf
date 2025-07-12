@@ -80,13 +80,26 @@ resource "azurerm_role_assignment" "spn_contributor_datalake" {
   ]
 }
 
-# Storage Account no RG datalake
-module "storage_account" {
-  source                = "./modules/storage_account"
-  resource_group_name   = azurerm_resource_group.rg_datalake.name
-  location              = azurerm_resource_group.rg_datalake.location
-  storage_account_name  = "medalforgestorage"
-  container_name        = "raw"
+# Storage Account para o Unity Catalog
+module "storage_for_uc" {
+  source               = "./modules/storage_account"
+  resource_group_name  = azurerm_resource_group.rg_datalake.name
+  location             = azurerm_resource_group.rg_datalake.location
+  storage_account_name = "medalforgedatabricks"
+  container_name       = ["uc-root"]    
+
+  providers = {
+    azurerm = azurerm.spn
+  }
+}
+
+# Storage Account para os dados do Lake
+module "storage_for_lake" {
+  source               = "./modules/storage_account"
+  resource_group_name  = azurerm_resource_group.rg_datalake.name
+  location             = azurerm_resource_group.rg_datalake.location
+  storage_account_name = "medalforgestorage"
+  container_names      = ["raw", "bronze", "silver", "gold"]     
 
   providers = {
     azurerm = azurerm.spn
@@ -94,13 +107,25 @@ module "storage_account" {
 }
 
 # Databricks Workspace no RG datalake
+
 module "databricks_workspace" {
   source              = "./modules/databricks_workspace"
   workspace_name      = "medalforge-databricks"
   location            = azurerm_resource_group.rg_datalake.location
   resource_group_name = azurerm_resource_group.rg_datalake.name
 
+  # Unity Catalog
+  uc_storage_root            = "abfss://${module.storage_for_uc.container_name}@${module.storage_for_uc.storage_account_name}.dfs.core.windows.net/"
+  uc_storage_credential_name = "medalforge-uc-cred"
+  storage_account_id         = module.storage_for_uc.storage_account_id
+
+  # Credenciais da SPN
+  spn_client_id     = var.spn_client_id
+  spn_client_secret = var.spn_client_secret
+  tenant_id         = var.tenant_id
+
   providers = {
-    azurerm = azurerm.spn
+    azurerm    = azurerm.spn
+    databricks = databricks.spn
   }
 }
