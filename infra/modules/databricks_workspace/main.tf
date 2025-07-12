@@ -11,6 +11,15 @@ terraform {
   }
 }
 
+provider "azurerm" {
+  alias    = "spn"
+  features {}
+}
+
+provider "databricks" {
+  alias = "spn"
+}
+
 
 resource "azurerm_databricks_workspace" "this" {
   name                           = var.workspace_name
