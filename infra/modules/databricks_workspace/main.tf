@@ -12,20 +12,6 @@ terraform {
 }
 
 
-provider "azurerm" {
-  alias    = "spn"
-  features {}
-}
-
-provider "databricks" {
-  alias                       = "spn"
-  azure_workspace_resource_id = azurerm_databricks_workspace.this.id
-  azure_client_id             = var.spn_client_id
-  azure_client_secret         = var.spn_client_secret
-  azure_tenant_id             = var.tenant_id
-}
-
-
 resource "azurerm_databricks_workspace" "this" {
   name                           = var.workspace_name
   location                       = var.location

@@ -120,8 +120,8 @@ module "databricks_workspace" {
   storage_account_id         = module.storage_for_uc.storage_account_id
 
   # Credenciais da SPN
-  spn_client_id     = var.spn_client_id
-  spn_client_secret = var.spn_client_secret
+  spn_client_id     = module.service_principal.spn_client_id
+  spn_client_secret = module.service_principal.spn_client_secret
   tenant_id         = var.tenant_id
 
   providers = {
