@@ -108,24 +108,39 @@ module "storage_for_lake" {
 
 # Databricks Workspace no RG datalake
 
-module "databricks_workspace" {
-  source              = "./modules/databricks_workspace"
+module "workspace_create" {
+  source              = "./modules/workspace_create"
   workspace_name      = "medalforge-databricks"
   location            = azurerm_resource_group.rg_datalake.location
   resource_group_name = azurerm_resource_group.rg_datalake.name
 
-  # Unity Catalog
-  uc_storage_root            = "abfss://${module.storage_for_uc.container_name}@${module.storage_for_uc.storage_account_name}.dfs.core.windows.net/"
-  uc_storage_credential_name = "medalforge-uc-cred"
-  storage_account_id         = module.storage_for_uc.storage_account_id
+  providers = {
+    azurerm = azurerm.spn
+  }
+}
 
-  # Credenciais da SPN
+# Atualizando configurações da Workspac
+module "workspace_config" {
+  source = "./modules/workspace_config"
+
+  # passa o workspace_id criado no módulo anterior
+  workspace_id = module.workspace_create.workspace_id
+
+  # Unity Catalog
+  metastore_name            = "medalforge-catalog"
+  uc_storage_root           = "abfss://${module.storage_for_uc.container_names[0]}@${module.storage_for_uc.storage_account_name}.dfs.core.windows.net/"
+  uc_storage_credential_name = "medalforge-uc-cred"
+
+  # SPN creds
   spn_client_id     = module.service_principal.spn_client_id
   spn_client_secret = module.service_principal.spn_client_secret
-  tenant_id         = var.tenant_id
+
+  # External locations URLs
+  bronze_url = "abfss://bronze@${module.storage_for_lake.storage_account_name}.dfs.core.windows.net/"
+  silver_url = "abfss://silver@${module.storage_for_lake.storage_account_name}.dfs.core.windows.net/"
+  gold_url   = "abfss://gold@${module.storage_for_lake.storage_account_name}.dfs.core.windows.net/"
 
   providers = {
-    azurerm    = azurerm.spn
     databricks = databricks.spn
   }
 }
