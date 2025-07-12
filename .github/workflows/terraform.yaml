@@ -163,19 +163,12 @@ jobs:
       - name: Plan & Apply Remaining Infra
         run: |
           cd infra
-          terraform plan -out=infraplan
+          terraform plan \
+            -target=module.storage_for_uc \
+            -target=module.storage_for_lake \
+            -target=module.workspace_create \ 
+            -out=infraplan
           terraform apply -auto-approve infraplan
-
-      - name: 🔒 Remover Owner como Admin da Workspace
-        run: |
-          # ID do Owner
-          OWNER_ID=${{ secrets.ARM_OWNER_ID }}
-          
-          WORKSPACE_ID=$(terraform output -raw workspace_id)
-          az role assignment delete \
-            --assignee "$OWNER_ID" \
-            --role "Databricks Workspace Admin" \
-            --scope "$WORKSPACE_ID"
           
       - name: Upload Terraform State
         uses: actions/upload-artifact@v4
@@ -183,32 +176,43 @@ jobs:
           name: tfstate-deployment
           path: infra/terraform.tfstate
 
-
-  destroy-infra:
-    name: 🧨 Destroy Infra (manual)
+  grant-account-admin:
+    name: 3️⃣ 🚧 Aguardar atribuição manual de Account Admin
+    needs: deploy-infra
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
+    environment: approval-required 
+    steps:
+      - name: 🧍 Esperando atribuição manual da SPN como Account Admin
+        run: echo "Atribua a SPN dinâmica como Account Admin na UI da workspace do Databricks antes de continuar."
+    
+  workspace-config:
+    name: 4️⃣ Configurar Unity Catalog e External Locations
+    needs: grant-account-admin
+    runs-on: ubuntu-latest
 
     env:
-      TF_VAR_subscription_id:         ${{ secrets.ARM_SUBSCRIPTION_ID }}
-      TF_VAR_tenant_id:               ${{ secrets.ARM_TENANT_ID }}
       TF_VAR_admin_client_id:         ${{ secrets.ARM_CLIENT_ID }}
       TF_VAR_admin_client_secret:     ${{ secrets.ARM_CLIENT_SECRET }}
+      TF_VAR_tenant_id:               ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_subscription_id:         ${{ secrets.ARM_SUBSCRIPTION_ID }}
       TF_VAR_bootstrap_spn_object_id: ${{ secrets.ARM_OBJECT_ID }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download Terraform State
-        uses: actions/download-artifact@v4
-        with:
-          name: tfstate-deployment
-          path: infra/
-
       - name: Azure Login (Admin SPN)
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Fetch SPN credentials from AKV
+        id: get_spn
+        run: |
+          SPN_ID=$(az keyvault secret show --vault-name $AKV_NAME --name spn-client-id --query value -o tsv)
+          SPN_SECRET=$(az keyvault secret show --vault-name $AKV_NAME --name spn-client-secret --query value -o tsv)
+          echo "::add-mask::$SPN_SECRET"
+          echo "TF_VAR_spn_client_id=$SPN_ID"         >> $GITHUB_ENV
+          echo "TF_VAR_spn_client_secret=$SPN_SECRET" >> $GITHUB_ENV
 
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -219,17 +223,18 @@ jobs:
           cd infra
           terraform init
 
-      - name: Fetch SPN credentials from AKV
-        id: get_spn
-        run: |
-          AKV="akv-medalforge-rbac-core"
-          SPN_ID=$(az keyvault secret show --vault-name $AKV --name spn-client-id --query value -o tsv)
-          SPN_SECRET=$(az keyvault secret show --vault-name $AKV --name spn-client-secret --query value -o tsv)
-          echo "::add-mask::$SPN_SECRET"
-          echo "TF_VAR_spn_client_id=$SPN_ID"         >> $GITHUB_ENV
-          echo "TF_VAR_spn_client_secret=$SPN_SECRET" >> $GITHUB_ENV
-
-      - name: Destroy Infra
+      - name: Apply workspace_config
         run: |
           cd infra
-          terraform destroy -auto-approve
+          terraform apply -auto-approve -target=module.workspace_config
+
+      - name: 🔒 Remover Owner como Admin da Workspace
+        run: |
+          OWNER_ID=${{ secrets.ARM_OWNER_ID }}
+          WORKSPACE_ID=$(terraform output -raw workspace_id)
+          az role assignment delete \
+            --assignee "$OWNER_ID" \
+            --role "Databricks Workspace Admin" \
+            --scope "$WORKSPACE_ID"
+
+  
