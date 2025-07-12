@@ -134,6 +134,7 @@ module "workspace_config" {
   # SPN creds
   spn_client_id     = module.service_principal.spn_client_id
   spn_client_secret = module.service_principal.spn_client_secret
+  tenant_id         = var.tenant_id
 
   # External locations URLs
   bronze_url = "abfss://bronze@${module.storage_for_lake.storage_account_name}.dfs.core.windows.net/"

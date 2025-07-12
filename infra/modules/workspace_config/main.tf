@@ -13,10 +13,10 @@ terraform {
 
 # Unity Catalog Metastore
 resource "databricks_metastore" "uc" {
-  provider               = databricks.spn
-  name                   = var.metastore_name
-  storage_root           = var.uc_storage_root
-  storage_credential_name = var.uc_storage_credential_name
+  provider                     = databricks.spn
+  name                         = var.metastore_name
+  storage_root                 = var.uc_storage_root
+  storage_root_credential_name = var.uc_storage_credential_name
 }
 
 resource "databricks_metastore_assignment" "attach" {
@@ -33,8 +33,9 @@ resource "databricks_storage_credential" "this" {
   name     = var.uc_storage_credential_name
 
   azure_service_principal {
-    client_id     = var.spn_client_id
-    client_secret = var.spn_client_secret
+    application_id     = var.spn_client_id
+    client_secret      = var.spn_client_secret
+    directory_id       = var.tenant_id
   }
 }
 

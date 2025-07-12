@@ -14,13 +14,18 @@ variable "uc_storage_credential_name" {
 }
 
 variable "spn_client_id" { 
-    type = string 
+    type        = string 
     sensitive   = true
 }
 
 variable "spn_client_secret" { 
-    type = string 
+    type        = string 
     sensitive   = true
+}
+
+variable "tenant_id" {
+    type      = string
+    sensitive = true
 }
 
 variable "bronze_url" { 
