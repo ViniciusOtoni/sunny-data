@@ -129,6 +129,7 @@ module "workspace_config" {
   # Unity Catalog
   metastore_name            = "medalforge-catalog"
   uc_storage_root           = "abfss://${module.storage_for_uc.container_names[0]}@${module.storage_for_uc.storage_account_name}.dfs.core.windows.net/"
+  uc_storage_credential_name = "medalforge-uc-cred"
 
   # SPN creds
   spn_client_id     = module.service_principal.spn_client_id
