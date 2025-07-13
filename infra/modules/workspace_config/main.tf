@@ -10,13 +10,11 @@ terraform {
 
 
 locals {
+  # Captura o número após "adb-" e antes do ponto
   matches = regexall("adb-(\\d+)\\.", var.workspace_url)
 
-  workspace_id_numeric = (
-    length(local.matches) > 0
-      ? tonumber(local.matches[0])
-      : 0
-  )
+
+  workspace_id_numeric = tonumber(local.matches[0][0])
 }
 
 
