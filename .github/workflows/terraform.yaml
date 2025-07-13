@@ -1,4 +1,4 @@
-name: Terraform CI/CD
+name: Deployment Azure Resources
 
 on:
   push:
