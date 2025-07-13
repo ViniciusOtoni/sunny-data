@@ -1,5 +1,5 @@
-variable "workspace_id" {
-  description = "ID da Databricks Workspace"
+variable "workspace_url" {
+  description = "URL da Databricks Workspace"
   type        = string
 }
 

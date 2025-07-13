@@ -7,6 +7,17 @@ terraform {
   }
 }
 
+
+
+locals {
+  # regexall retorna lista de strings que casaram o grupo (\d+)
+  matches             = regexall("adb-(\\d+)\\.", var.workspace_url)
+  workspace_id_numeric = length(local.matches) > 0
+    ? tonumber(local.matches[0])
+    : 0
+}
+
+
 # Storage Credential
 resource "databricks_storage_credential" "this" {
   provider = databricks.spn
@@ -29,7 +40,7 @@ resource "databricks_metastore" "uc" {
 
 resource "databricks_metastore_assignment" "attach" {
   provider     = databricks.spn
-  workspace_id = var.workspace_id
+  workspace_id = local.workspace_id_numeric
   metastore_id = databricks_metastore.uc.id
 
   depends_on = [ databricks_metastore.uc ]
