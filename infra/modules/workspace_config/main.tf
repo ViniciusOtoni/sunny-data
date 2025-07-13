@@ -10,11 +10,13 @@ terraform {
 
 
 locals {
-  # regexall retorna lista de strings que casaram o grupo (\d+)
-  matches             = regexall("adb-(\\d+)\\.", var.workspace_url)
-  workspace_id_numeric = length(local.matches) > 0
-    ? tonumber(local.matches[0])
-    : 0
+  matches = regexall("adb-(\\d+)\\.", var.workspace_url)
+
+  workspace_id_numeric = (
+    length(local.matches) > 0
+      ? tonumber(local.matches[0])
+      : 0
+  )
 }
 
 
