@@ -1,4 +1,4 @@
-name: Deployment Azure Resources
+name: Terraform CI/CD
 
 on:
   push:
@@ -17,7 +17,6 @@ jobs:
       TF_VAR_admin_client_secret:     ${{ secrets.ARM_CLIENT_SECRET }}
       TF_VAR_bootstrap_spn_object_id: ${{ secrets.ARM_OBJECT_ID }}
 
-
     steps:
       - uses: actions/checkout@v4
 
@@ -31,22 +30,17 @@ jobs:
           terraform_version: 1.6.6
 
       - name: Init Terraform
-        run: |
-          cd infra
-          terraform init
+        run: terraform -chdir=infra init
 
       - name: Plan Resource Groups
         run: |
-          cd infra
-          terraform plan \
+          terraform -chdir=infra plan \
             -target=azurerm_resource_group.rg_core \
             -target=azurerm_resource_group.rg_datalake \
             -out=rgs.plan
 
       - name: Apply Resource Groups
-        run: |
-          cd infra
-          terraform apply -auto-approve rgs.plan
+        run: terraform -chdir=infra apply -auto-approve rgs.plan
 
       - name: Upload Terraform State
         uses: actions/upload-artifact@v4
@@ -65,7 +59,6 @@ jobs:
       TF_VAR_admin_client_id:         ${{ secrets.ARM_CLIENT_ID }}
       TF_VAR_admin_client_secret:     ${{ secrets.ARM_CLIENT_SECRET }}
       TF_VAR_bootstrap_spn_object_id: ${{ secrets.ARM_OBJECT_ID }}
-
 
     steps:
       - uses: actions/checkout@v4
@@ -92,30 +85,26 @@ jobs:
           terraform_version: 1.6.6
 
       - name: Init Terraform
-        run: |
-          cd infra
-          terraform init
+        run: terraform -chdir=infra init
 
       - name: Plan SPN + Role Assignments + AKV
         run: |
-          cd infra
-          terraform plan \
+          terraform -chdir=infra plan \
             -target=module.service_principal \
-            -target=azurerm_role_assignment.spn_contributor_datalake \
             -target=azurerm_role_assignment.spn_reader_subscription \
+            -target=azurerm_role_assignment.spn_contributor_datalake \
             -target=module.key_vault \
             -out=bootstrap.plan
 
       - name: Apply SPN + Role Assignments + AKV
-        run: |
-          cd infra
-          terraform apply -auto-approve bootstrap.plan
+        run: terraform -chdir=infra apply -auto-approve bootstrap.plan
 
       - name: Upload Terraform State
         uses: actions/upload-artifact@v4
         with:
           name: tfstate-bootstrap
           path: infra/terraform.tfstate
+
 
   deploy-infra:
     name: 2️⃣ Deploy Remaining Infra
@@ -148,12 +137,9 @@ jobs:
           terraform_version: 1.6.6
 
       - name: Init Terraform
-        run: |
-          cd infra
-          terraform init
+        run: terraform -chdir=infra init
 
       - name: Fetch SPN credentials from AKV
-        id: get_spn
         run: |
           AKV="akv-medalforge-rbac-core"
           SPN_ID=$(az keyvault secret show --vault-name $AKV --name spn-client-id --query value -o tsv)
@@ -169,14 +155,78 @@ jobs:
             -target=module.storage_for_lake \
             -target=module.workspace_create \
             -out=infraplan
-
           terraform -chdir=infra apply -auto-approve infraplan
-      
+
       - name: Upload Terraform State
         uses: actions/upload-artifact@v4
         with:
           name: tfstate-deployment
           path: infra/terraform.tfstate
-    
 
-  
+
+  grant-account-admin:
+    name: 3️⃣ Aguardar grant manual
+    needs: deploy-infra
+    runs-on: ubuntu-latest
+    environment: approval-required
+
+    steps:
+      - name: Role Account Admin pendente
+        run: |
+          echo "Por favor, atribua manualmente a SPN dinâmica como 'account_admin' no Databricks Account Console."
+          echo "Após conceder, clique em 'Approve and deploy' para continuar."
+
+
+  workspace-config:
+    name: 4️⃣ Configurar Unity Catalog e External Locations
+    needs: grant-account-admin
+    runs-on: ubuntu-latest
+
+    env:
+      AKV_NAME:                       "akv-medalforge-rbac-core"
+      TF_VAR_admin_client_id:         ${{ secrets.ARM_CLIENT_ID }}
+      TF_VAR_admin_client_secret:     ${{ secrets.ARM_CLIENT_SECRET }}
+      TF_VAR_tenant_id:               ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_subscription_id:         ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_bootstrap_spn_object_id: ${{ secrets.ARM_OBJECT_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Terraform State
+        uses: actions/download-artifact@v4
+        with:
+          name: tfstate-deployment
+          path: infra/
+
+      - name: Azure Login (Admin SPN)
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Fetch SPN credentials from AKV
+        id: get_spn
+        run: |
+          SPN_ID=$(az keyvault secret show --vault-name $AKV_NAME --name spn-client-id --query value -o tsv)
+          SPN_SECRET=$(az keyvault secret show --vault-name $AKV_NAME --name spn-client-secret --query value -o tsv)
+          echo "::add-mask::$SPN_SECRET"
+          echo "TF_VAR_spn_client_id=$SPN_ID"         >> $GITHUB_ENV
+          echo "TF_VAR_spn_client_secret=$SPN_SECRET" >> $GITHUB_ENV
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Init Terraform
+        run: terraform -chdir=infra init
+
+      - name: Apply Unity Catalog & External Locations
+        run: terraform -chdir=infra apply -auto-approve -target=module.workspace_config
+
+      - name: Remover seu Owner como Admin da Workspace
+        run: |
+          WORKSPACE_ID=$(terraform -chdir=infra output -raw workspace_id)
+          az role assignment delete \
+            --assignee "${{ secrets.ARM_OWNER_ID }}" \
+            --role "Databricks Workspace Admin" \
+            --scope "$WORKSPACE_ID"
