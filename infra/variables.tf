@@ -37,3 +37,9 @@ variable "spn_client_secret" {
   default   = ""
   sensitive = true
 }
+
+variable "databricks_account_id" {
+  type      = string
+  sensitive = true
+  description = "ID do account"
+}
