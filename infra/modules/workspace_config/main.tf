@@ -1,30 +1,14 @@
-terraform {
-  required_providers {
-    databricks = {
-      source  = "databricks/databricks"
-      version = "~> 1.0"
-    }
-  }
-}
-
-
-
+# extrai o ID numérico do workspace
 locals {
-  # Captura o número após "adb-" e antes do ponto
-  matches = regexall("adb-(\\d+)\\.", var.workspace_url)
-
-
+  matches              = regexall("adb-(\\d+)\\.", var.workspace_url)
   workspace_id_numeric = tonumber(local.matches[0][0])
 }
 
-
-# Unity Catalog Metastore
 resource "databricks_metastore" "uc" {
   provider     = databricks.account
   name         = var.metastore_name
   storage_root = var.uc_storage_root
 }
-
 
 resource "databricks_metastore_assignment" "attach" {
   provider     = databricks.spn
@@ -36,7 +20,6 @@ resource "null_resource" "wait_for_assignment" {
   depends_on = [databricks_metastore_assignment.attach]
 }
 
-# Storage Credential
 resource "databricks_storage_credential" "this" {
   provider = databricks.spn
   name     = var.uc_storage_credential_name
@@ -50,8 +33,6 @@ resource "databricks_storage_credential" "this" {
   depends_on = [null_resource.wait_for_assignment]
 }
 
-
-# External Locations
 resource "databricks_external_location" "bronze" {
   provider        = databricks.spn
   name            = "bronze"

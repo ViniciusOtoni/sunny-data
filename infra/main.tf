@@ -143,4 +143,11 @@ module "workspace_config" {
   silver_url = "abfss://silver@${module.storage_for_lake.storage_account_name}.dfs.core.windows.net/"
   gold_url   = "abfss://gold@${module.storage_for_lake.storage_account_name}.dfs.core.windows.net/"
 
+  
+  providers = {
+    # mapeia o alias interno "spn" para o provider databricks.spn do root
+    databricks.spn     = databricks.spn
+    # mapeia o alias interno "account" para o provider databricks.account do root
+    databricks.account = databricks.account
+  }
 }
