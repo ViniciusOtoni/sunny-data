@@ -126,6 +126,7 @@ module "workspace_config" {
   # passa o workspace_id criado no módulo anterior
   workspace_url = module.workspace_create.workspace_url
   workspace_id = module.workspace_create.workspace_id
+  databricks_account_id = var.databricks_account_id
 
   # Unity Catalog
   metastore_name            = "medalforge-catalog"
