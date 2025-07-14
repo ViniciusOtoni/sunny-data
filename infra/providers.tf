@@ -47,5 +47,5 @@ provider "databricks" {
   account_id      = var.databricks_account_id
   client_id       = var.spn_client_id
   client_secret   = var.spn_client_secret
-  tenant_id       = var.tenant_id
+
 }
