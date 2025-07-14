@@ -18,34 +18,37 @@ locals {
 }
 
 
+# Unity Catalog Metastore
+resource "databricks_metastore" "uc" {
+  provider     = databricks.account
+  name         = var.metastore_name
+  storage_root = var.uc_storage_root
+}
+
+
+resource "databricks_metastore_assignment" "attach" {
+  provider     = databricks.spn
+  workspace_id = local.workspace_id_numeric
+  metastore_id = databricks_metastore.uc.id
+}
+
+resource "null_resource" "wait_for_assignment" {
+  depends_on = [databricks_metastore_assignment.attach]
+}
+
 # Storage Credential
 resource "databricks_storage_credential" "this" {
   provider = databricks.spn
   name     = var.uc_storage_credential_name
 
   azure_service_principal {
-    application_id     = var.spn_client_id
-    client_secret      = var.spn_client_secret
-    directory_id       = var.tenant_id
+    application_id = var.spn_client_id
+    client_secret  = var.spn_client_secret
+    directory_id   = var.tenant_id
   }
+
+  depends_on = [null_resource.wait_for_assignment]
 }
-
-# Unity Catalog Metastore
-resource "databricks_metastore" "uc" {
-  provider                     = databricks.spn
-  name                         = var.metastore_name
-  storage_root                 = var.uc_storage_root
-  storage_root_credential_id   = databricks_storage_credential.this.id
-}
-
-resource "databricks_metastore_assignment" "attach" {
-  provider     = databricks.spn
-  workspace_id = local.workspace_id_numeric
-  metastore_id = databricks_metastore.uc.id
-
-  depends_on = [ databricks_metastore.uc ]
-}
-
 
 
 # External Locations

@@ -53,3 +53,9 @@ variable "gold_url" {
   description = "URL ABFSS para a camada Gold"
   type        = string
 }
+
+variable "databricks_account_id" {
+  type      = string
+  sensitive = true
+  description = "ID do account"
+}
