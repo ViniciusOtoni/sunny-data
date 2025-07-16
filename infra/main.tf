@@ -119,6 +119,22 @@ module "workspace_create" {
   }
 }
 
+# “Importar” o SPN no Databricks Account
+resource "databricks_service_principal" "spn" {
+  provider       = databricks.account
+  application_id = var.spn_client_id
+}
+
+# Atribuindo role de account admin para a SPN
+resource "databricks_service_principal_role" "spn_account_admin" {
+  provider              = databricks.account
+  service_principal_id  = databricks_service_principal.spn.id
+  role                  = "account_admin"
+
+  # garante que só acontece depois de criar/importar a SPN no account
+  depends_on = [ databricks_service_principal.spn ]
+}
+
 # Atualizando configurações da Workspac
 module "workspace_config" {
   source = "./modules/workspace_config"
@@ -150,4 +166,8 @@ module "workspace_config" {
     # mapeia o alias interno "account" para o provider databricks.account do root
     databricks.account = databricks.account
   }
+
+  depends_on = [
+    databricks_service_principal_role.spn_account_admin
+  ]
 }

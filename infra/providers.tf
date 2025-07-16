@@ -42,10 +42,11 @@ provider "databricks" {
 
 # provider para recursos de nível de conta
 provider "databricks" {
-  alias           = "account"
-  host            = "https://accounts.azuredatabricks.net"
-  account_id      = var.databricks_account_id
-  client_id       = var.spn_client_id
-  client_secret   = var.spn_client_secret
+  alias      = "account"
+  host       = "https://accounts.azuredatabricks.net"
+  account_id = var.databricks_account_id
 
+  # OAuth2 M2M
+  client_id     = var.spn_client_id
+  client_secret = var.spn_client_secret
 }

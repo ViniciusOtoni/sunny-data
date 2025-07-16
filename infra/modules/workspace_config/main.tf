@@ -4,6 +4,7 @@ locals {
   workspace_id_numeric = tonumber(local.matches[0][0])
 }
 
+# Criar Metastore no Databricks
 resource "databricks_metastore" "uc" {
   provider     = databricks.account
   name         = var.metastore_name
