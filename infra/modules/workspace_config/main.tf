@@ -23,22 +23,11 @@ resource "null_resource" "wait_for_assignment" {
   depends_on = [databricks_metastore_assignment.attach]
 }
 
-# Storage Credential NIVÉL ACCOUNT!
-resource "databricks_account_storage_credential" "uc" {
-  provider                = databricks.account
-  storage_credential_name = var.uc_storage_credential_name
 
-  azure_service_principal {
-    application_id = var.spn_client_id
-    tenant_id      = var.tenant_id
-    client_secret  = var.spn_client_secret
-  }
-}
-
-# Storage Credential NÍVEL WORKSPACE!
+# Storage Credential 
 resource "databricks_storage_credential" "uc" {
   provider = databricks.spn
-  name     = databricks_account_storage_credential.uc.storage_credential_name
+  name     = var.uc_storage_credential_name
 
   depends_on = [
     null_resource.wait_for_assignment,
@@ -50,19 +39,19 @@ resource "databricks_external_location" "bronze" {
   provider        = databricks.spn
   name            = "bronze"
   url             = var.bronze_url
-  credential_name = databricks_account_storage_credential.uc.storage_credential_name
+  credential_name = databricks_storage_credential.uc.name
 }
 
 resource "databricks_external_location" "silver" {
   provider        = databricks.spn
   name            = "silver"
   url             = var.silver_url
-  credential_name = databricks_account_storage_credential.uc.storage_credential_name
+  credential_name = databricks_storage_credential.uc.name
 }
 
 resource "databricks_external_location" "gold" {
   provider        = databricks.spn
   name            = "gold"
   url             = var.gold_url
-  credential_name = databricks_account_storage_credential.uc.storage_credential_name
+  credential_name = databricks_storage_credential.uc.name
 }
