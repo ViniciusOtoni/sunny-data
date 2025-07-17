@@ -29,6 +29,12 @@ resource "databricks_storage_credential" "uc" {
   provider = databricks.spn
   name     = var.uc_storage_credential_name
 
+  azure_service_principal {
+    application_id = var.spn_client_id
+    tenant_id      = var.tenant_id
+    client_secret  = var.spn_client_secret
+  }
+
   depends_on = [
     null_resource.wait_for_assignment,
   ]
