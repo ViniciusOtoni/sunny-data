@@ -150,8 +150,4 @@ module "workspace_config" {
     # mapeia o alias interno "account" para o provider databricks.account do root
     databricks.account = databricks.account
   }
-
-  depends_on = [
-    databricks_service_principal_role.spn_account_admin
-  ]
 }
