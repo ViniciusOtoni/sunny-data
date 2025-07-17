@@ -31,8 +31,8 @@ resource "databricks_storage_credential" "uc" {
 
   azure_service_principal {
     application_id = var.spn_client_id
-    tenant_id      = var.tenant_id
     client_secret  = var.spn_client_secret
+    directory_id   = var.tenant_id
   }
 
   depends_on = [
