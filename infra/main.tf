@@ -140,6 +140,7 @@ module "workspace_config" {
   tenant_id         = var.tenant_id
 
   # External locations URLs
+  raw_url = "abfss://raw@${module.storage_for_lake.storage_account_name}.dfs.core.windows.net/"
   bronze_url = "abfss://bronze@${module.storage_for_lake.storage_account_name}.dfs.core.windows.net/"
   silver_url = "abfss://silver@${module.storage_for_lake.storage_account_name}.dfs.core.windows.net/"
   gold_url   = "abfss://gold@${module.storage_for_lake.storage_account_name}.dfs.core.windows.net/"

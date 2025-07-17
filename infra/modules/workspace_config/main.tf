@@ -40,12 +40,32 @@ resource "databricks_storage_credential" "uc" {
   ]
 }
 
+# Delay artificial após a criação do Storage Credential
+resource "null_resource" "wait_for_credential" {
+  depends_on = [databricks_storage_credential.uc]
+
+  provisioner "local-exec" {
+    command = "echo 'Esperando propagação do Storage Credential...' && sleep 30"
+  }
+}
+
 # External locations
+resource "databricks_external_location" "raw" {
+  provider        = databricks.spn
+  name            = "raw"
+  url             = var.raw_url
+  credential_name = databricks_storage_credential.uc.name
+
+  depends_on = [null_resource.wait_for_credential]
+}
+
 resource "databricks_external_location" "bronze" {
   provider        = databricks.spn
   name            = "bronze"
   url             = var.bronze_url
   credential_name = databricks_storage_credential.uc.name
+
+  depends_on = [null_resource.wait_for_credential]
 }
 
 resource "databricks_external_location" "silver" {
@@ -53,6 +73,8 @@ resource "databricks_external_location" "silver" {
   name            = "silver"
   url             = var.silver_url
   credential_name = databricks_storage_credential.uc.name
+
+  depends_on = [null_resource.wait_for_credential]
 }
 
 resource "databricks_external_location" "gold" {
@@ -60,4 +82,6 @@ resource "databricks_external_location" "gold" {
   name            = "gold"
   url             = var.gold_url
   credential_name = databricks_storage_credential.uc.name
+
+  depends_on = [null_resource.wait_for_credential]
 }

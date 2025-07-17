@@ -39,6 +39,12 @@ variable "tenant_id" {
   type        = string
 }
 
+variable "raw_url" {
+  description = "URL ABFSS para a camada Raw"
+  type        = string
+}
+
+
 variable "bronze_url" {
   description = "URL ABFSS para a camada Bronze"
   type        = string
