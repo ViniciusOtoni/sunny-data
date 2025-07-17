@@ -9,6 +9,7 @@ resource "databricks_metastore" "uc" {
   provider     = databricks.account
   name         = var.metastore_name
   storage_root = var.uc_storage_root
+  region       = var.databricks_region
 }
 
 resource "databricks_metastore_assignment" "attach" {

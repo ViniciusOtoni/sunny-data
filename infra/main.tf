@@ -129,6 +129,7 @@ module "workspace_config" {
   databricks_account_id = var.databricks_account_id
 
   # Unity Catalog
+  databricks_region         = azurerm_resource_group.rg_datalake.location
   metastore_name            = "medalforge-catalog"
   uc_storage_root           = "abfss://${module.storage_for_uc.container_names[0]}@${module.storage_for_uc.storage_account_name}.dfs.core.windows.net/"
   uc_storage_credential_name = "medalforge-uc-cred"

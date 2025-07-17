@@ -59,3 +59,8 @@ variable "databricks_account_id" {
   sensitive = true
   description = "ID do account"
 }
+
+variable "databricks_region" {
+  description = "Região do seu Databricks Account / Unity Catalog (ex: Brazil South)"
+  type        = string
+}
