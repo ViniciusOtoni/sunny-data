@@ -46,7 +46,8 @@ provider "databricks" {
   host       = "https://accounts.azuredatabricks.net"
   account_id = var.databricks_account_id
 
-  # OAuth2 M2M
-  client_id     = var.spn_client_id
-  client_secret = var.spn_client_secret
+  # Autenticação via Service Principal (OAuth M2M)
+  azure_client_id     = var.spn_client_id
+  azure_client_secret = var.spn_client_secret
+  azure_tenant_id     = var.tenant_id
 }
