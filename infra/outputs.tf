@@ -14,3 +14,7 @@ output "spn_client_secret" {
   value     = module.service_principal.spn_client_secret
   sensitive = true
 }
+
+output "workspace_id" {
+  value = module.workspace_create.workspace_id
+}

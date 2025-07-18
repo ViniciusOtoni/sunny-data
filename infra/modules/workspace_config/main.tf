@@ -4,12 +4,25 @@ locals {
   workspace_id_numeric = tonumber(local.matches[0][0])
 }
 
+# Delay artificial para Sync de role "account_admin"
+resource "null_resource" "sync_account_admin" {
+  depends_on = [databricks_storage_credential.uc]
+
+  provisioner "local-exec" {
+    command = "echo 'Esperando sync da role de account admin...' && sleep 200"
+  }
+}
+
 # Criar Metastore no Databricks
 resource "databricks_metastore" "uc" {
   provider     = databricks.account
   name         = var.metastore_name
   storage_root = var.uc_storage_root
   region       = var.databricks_region
+
+  depends_on = [
+    null_resource.sync_account_admin,
+  ]
 }
 
 # Attach ao workspace o catálogo
