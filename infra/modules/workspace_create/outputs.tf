@@ -5,7 +5,3 @@ output "workspace_id" {
 output "workspace_url" {
   value = azurerm_databricks_workspace.this.workspace_url
 }
-
-output "workspace_name" {
-  value = azurerm_databricks_workspace.this.workspace_name
-}

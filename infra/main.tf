@@ -106,6 +106,32 @@ module "storage_for_lake" {
   }
 }
 
+# Criar Access Conector
+resource "azurerm_databricks_access_connector" "uc" {
+  name                = "ac-medalforge"
+  resource_group_name = azurerm_resource_group.rg_datalake.name
+  location            = azurerm_resource_group.rg_datalake.location
+
+  identity {
+    type = "SystemAssigned"
+  }
+}
+
+# Role assignment: Managed Identity precisa de permissão em ambos  
+resource "azurerm_role_assignment" "to_uc" {
+  scope                = module.storage_for_uc.storage_account_id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_databricks_access_connector.uc.identity[0].principal_id
+}
+
+resource "azurerm_role_assignment" "to_lake" {
+  scope                = module.storage_for_lake.storage_account_id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_databricks_access_connector.uc.identity[0].principal_id
+}
+
+
+
 # Databricks Workspace no RG datalake
 
 module "workspace_create" {
@@ -113,30 +139,14 @@ module "workspace_create" {
   workspace_name      = "medalforge-databricks"
   location            = azurerm_resource_group.rg_datalake.location
   resource_group_name = azurerm_resource_group.rg_datalake.name
+  access_connector_id = azurerm_databricks_access_connector.uc.id
 
   providers = {
     azurerm = azurerm.spn
   }
 }
 
-# Criar Access Conector
-resource "azurerm_databricks_access_connector" "uc" {
-  name                = "ac-medalforge"
-  resource_group_name = azurerm_resource_group.rg_datalake.name
-  location            = azurerm_resource_group.rg_datalake.location
-  workspace_name      = module.workspace_create.workspace_name
-  identity {
-    type = "SystemAssigned"
-  }
-}
 
-# Permissão para a identidade gerênciada criada
-
-resource "azurerm_role_assignment" "ac_storage_blob_data_contributor" {
-  scope                = azurerm_storage_account.lake.id
-  role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azurerm_databricks_access_connector.uc.identity[0].principal_id
-}
 
 
 # Atualizando configurações da Workspac
