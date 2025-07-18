@@ -19,7 +19,7 @@ resource "azurerm_databricks_workspace" "this" {
   managed_resource_group_name = "${var.resource_group_name}-databricks-rg"
 
   access_connector_id = var.access_connector_id
-  default_storage_firewall_enabled = true
+  default_storage_firewall_enabled = false
 
 }
 
