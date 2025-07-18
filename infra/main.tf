@@ -124,7 +124,7 @@ resource "azurerm_databricks_access_connector" "uc" {
   name                = "ac-medalforge"
   resource_group_name = azurerm_resource_group.rg_datalake.name
   location            = azurerm_resource_group.rg_datalake.location
-  databricks_workspace_id   = module.workspace_create.workspace_id
+  workspace_id   = module.workspace_create.workspace_id
   identity {
     type = "SystemAssigned"
   }
