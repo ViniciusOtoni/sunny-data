@@ -157,6 +157,9 @@ jobs:
             -target=module.storage_for_uc \
             -target=module.storage_for_lake \
             -target=module.workspace_create \
+            -target=azurerm_databricks_access_connector.uc \
+            -target=azurerm_role_assignment.to_uc \
+            -target=azurerm_role_assignment.to_lake \
             -out=infraplan
           terraform -chdir=infra apply -auto-approve infraplan
 
