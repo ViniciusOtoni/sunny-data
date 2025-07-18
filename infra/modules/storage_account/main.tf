@@ -14,6 +14,8 @@ resource "azurerm_storage_account" "this" {
   account_tier             = "Standard"
   account_replication_type = "LRS"
 
+  is_hns_enabled = true
+
   tags = {
     environment = "dev"
   }

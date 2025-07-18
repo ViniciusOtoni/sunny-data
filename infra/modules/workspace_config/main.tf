@@ -45,7 +45,7 @@ resource "null_resource" "wait_for_credential" {
   depends_on = [databricks_storage_credential.uc]
 
   provisioner "local-exec" {
-    command = "echo 'Esperando propagação do Storage Credential...' && sleep 300"
+    command = "echo 'Esperando propagação do Storage Credential...' && sleep 120"
   }
 }
 
