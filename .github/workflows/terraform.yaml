@@ -229,11 +229,3 @@ jobs:
 
       - name: Apply Unity Catalog & External Locations
         run: terraform -chdir=infra apply -auto-approve -target=module.workspace_config
-
-      - name: Remover seu Owner como Admin da Workspace
-        run: |
-          WORKSPACE_ID=$(terraform -chdir=infra output -raw workspace_id)
-          az role assignment delete \
-            --assignee "${{ secrets.ARM_OWNER_ID }}" \
-            --role "Databricks Workspace Admin" \
-            --scope "$WORKSPACE_ID"
