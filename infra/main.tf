@@ -119,15 +119,21 @@ resource "azurerm_databricks_access_connector" "uc" {
 
 # Role assignment: Managed Identity precisa de permissão em ambos  
 resource "azurerm_role_assignment" "to_uc" {
+  provider             = azurerm.admin
   scope                = module.storage_for_uc.storage_account_id
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = azurerm_databricks_access_connector.uc.identity[0].principal_id
+
+  depends_on           = [azurerm_databricks_access_connector.uc]
 }
 
 resource "azurerm_role_assignment" "to_lake" {
+  provider             = azurerm.admin
   scope                = module.storage_for_lake.storage_account_id
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = azurerm_databricks_access_connector.uc.identity[0].principal_id
+  
+  depends_on           = [azurerm_databricks_access_connector.uc]
 }
 
 
