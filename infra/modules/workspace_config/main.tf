@@ -6,7 +6,6 @@ locals {
 
 # Delay artificial para Sync de role "account_admin"
 resource "null_resource" "sync_account_admin" {
-  depends_on = [databricks_storage_credential.uc]
 
   provisioner "local-exec" {
     command = "echo 'Esperando sync da role de account admin...' && sleep 200"
