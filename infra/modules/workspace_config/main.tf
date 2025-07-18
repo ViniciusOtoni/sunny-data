@@ -24,15 +24,15 @@ resource "null_resource" "wait_for_assignment" {
 }
 
 
+
 # Storage Credential 
 resource "databricks_storage_credential" "uc" {
   provider = databricks.spn
   name     = var.uc_storage_credential_name
 
-  azure_service_principal {
-    application_id = var.spn_client_id
-    client_secret  = var.spn_client_secret
-    directory_id   = var.tenant_id
+   
+  azure_managed_identity {
+    access_connector_id = var.azure_managed_identity_id
   }
 
   depends_on = [
@@ -56,6 +56,7 @@ resource "databricks_external_location" "raw" {
   url             = var.raw_url
   credential_name = databricks_storage_credential.uc.name
 
+
   depends_on = [null_resource.wait_for_credential]
 }
 
@@ -64,6 +65,7 @@ resource "databricks_external_location" "bronze" {
   name            = "bronze"
   url             = var.bronze_url
   credential_name = databricks_storage_credential.uc.name
+  
 
   depends_on = [null_resource.wait_for_credential]
 }
@@ -73,6 +75,7 @@ resource "databricks_external_location" "silver" {
   name            = "silver"
   url             = var.silver_url
   credential_name = databricks_storage_credential.uc.name
+ 
 
   depends_on = [null_resource.wait_for_credential]
 }
@@ -82,6 +85,7 @@ resource "databricks_external_location" "gold" {
   name            = "gold"
   url             = var.gold_url
   credential_name = databricks_storage_credential.uc.name
+
 
   depends_on = [null_resource.wait_for_credential]
 }

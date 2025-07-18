@@ -119,14 +119,35 @@ module "workspace_create" {
   }
 }
 
+# Criar Access Conector
+resource "azurerm_databricks_access_connector" "uc" {
+  name                = "ac-medalforge"
+  resource_group_name = azurerm_resource_group.rg_datalake.name
+  location            = azurerm_resource_group.rg_datalake.location
+  workspace_url       = module.workspace_create.workspace_url # opcional se já usar via ID
+  identity {
+    type = "SystemAssigned"
+  }
+}
+
+# Permissão para a identidade gerênciada criada
+
+resource "azurerm_role_assignment" "ac_storage_blob_data_contributor" {
+  scope                = azurerm_storage_account.lake.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = azurerm_databricks_access_connector.uc.identity[0].principal_id
+}
+
+
 # Atualizando configurações da Workspac
 module "workspace_config" {
   source = "./modules/workspace_config"
 
   # passa o workspace_id criado no módulo anterior
-  workspace_url = module.workspace_create.workspace_url
-  workspace_id = module.workspace_create.workspace_id
-  databricks_account_id = var.databricks_account_id
+  workspace_url             = module.workspace_create.workspace_url
+  workspace_id              = module.workspace_create.workspace_id
+  databricks_account_id     = var.databricks_account_id
+  azure_managed_identity_id = azurerm_databricks_access_connector.uc.id
 
   # Unity Catalog
   databricks_region         = azurerm_resource_group.rg_datalake.location

@@ -11,11 +11,3 @@ terraform {
   }
 }
 
-# declara os dois aliases que o módulo vai usar
-provider "databricks" {
-  alias = "spn"
-}
-
-provider "databricks" {
-  alias = "account"
-}

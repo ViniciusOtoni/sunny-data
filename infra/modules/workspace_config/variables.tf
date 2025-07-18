@@ -39,6 +39,11 @@ variable "tenant_id" {
   type        = string
 }
 
+variable "azure_managed_identity_id" {
+  description = "ID da identidade gerênciada"
+  type        = string
+}
+
 variable "raw_url" {
   description = "URL ABFSS para a camada Raw"
   type        = string
