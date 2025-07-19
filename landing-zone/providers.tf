@@ -12,6 +12,6 @@ provider "azurerm" {
 }
 
 data "terraform_remote_state" "identity" {
-  backend = "local"      # ainda local;
+  backend = "local"   
   config  = { path = "../core-identity/terraform.tfstate" }
 }

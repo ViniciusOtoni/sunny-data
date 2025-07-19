@@ -5,7 +5,7 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  apply-and-migrate:
+  Migration-Terraform-Backend:
     runs-on: ubuntu-latest
     env:
       TF_VAR_subscription_id:  ${{ secrets.ARM_SUBSCRIPTION_ID }}
