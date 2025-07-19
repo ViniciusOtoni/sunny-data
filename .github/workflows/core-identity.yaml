@@ -6,7 +6,7 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  plan-apply:
+  Deployment Core Ecosystem:
     runs-on: ubuntu-latest
 
     env:
