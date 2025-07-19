@@ -18,7 +18,8 @@ jobs:
 
     - name: Azure Login (SPN bootstrap)
       uses: azure/login@v2
-      with: { creds: ${{ secrets.AZURE_CREDENTIALS }} }
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
 
     - uses: hashicorp/setup-terraform@v3
       with: { terraform_version: 1.6.6 }
