@@ -1,0 +1,37 @@
+name: core-identity
+on:
+  push:
+    paths:
+      - 'core-identity/**'
+  workflow_dispatch: {}
+
+jobs:
+  plan-apply:
+    runs-on: ubuntu-latest
+
+    env:
+      # Secrets configurados em Settings > Actions > Secrets
+      TF_VAR_subscription_id:     ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id:           ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_admin_client_id:     ${{ secrets.ARM_CLIENT_ID }}
+      TF_VAR_admin_client_secret: ${{ secrets.ARM_CLIENT_SECRET }}
+      TF_VAR_bootstrap_spn_object_id: ${{ secrets.ARM_OBJECT_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Faz login na Azure com a SPN bootstrap (Owner)
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Terraform Init
+        run: terraform -chdir=core-identity init
+
+      - name: Terraform Apply
+        run: terraform -chdir=core-identity apply -auto-approve
