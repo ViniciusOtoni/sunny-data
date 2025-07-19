@@ -35,3 +35,10 @@ jobs:
 
       - name: Terraform Apply
         run: terraform -chdir=core-identity apply -auto-approve
+
+        # Fazendo upload do tfstate no artefato > Utilizado para consumir no próximo JOB
+      - name: Upload Terraform state
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfstate-core
+          path: core-identity/terraform.tfstate

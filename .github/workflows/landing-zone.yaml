@@ -24,6 +24,13 @@ jobs:
     - uses: hashicorp/setup-terraform@v3
       with: { terraform_version: 1.6.6 }
 
+      # Recriando a pasta do tfsate através do valor recuperado no artefato
+      - name: Download core-identity state
+        uses: actions/download-artifact@v4
+        with:
+          name: tfstate-core           
+          path: core-identity          
+
     # 1) Init / Apply usando backend local
     - name: Terraform Init (local)
       run: terraform -chdir=landing-zone init
@@ -49,4 +56,22 @@ jobs:
           -backend-config="container_name=tfstate-landing" \
           -backend-config="resource_group_name=${{ steps.tfout.outputs.rg }}" \
           -backend-config="key=landing.tfstate" \
+          -migrate-state -reconfigure
+
+    # 4) cria container tfstate-core (CLI)
+    - name: Create container tfstate-core in Storage Account
+      run: |
+        az storage container create \
+          --name tfstate-core \
+          --account-name ${{ steps.tfout.outputs.sa }} \
+          --auth-mode login
+
+    # 5) migra o tfstate do core-identity para o mesmo Storage Account
+    - name: Migrate core state to Storage Account
+      run: |
+        terraform -chdir=core-identity init \
+          -backend-config="storage_account_name=${{ steps.tfout.outputs.sa }}" \
+          -backend-config="container_name=tfstate-core" \
+          -backend-config="resource_group_name=${{ steps.tfout.outputs.rg }}" \
+          -backend-config="key=core.tfstate" \
           -migrate-state -reconfigure

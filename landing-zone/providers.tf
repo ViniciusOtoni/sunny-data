@@ -11,7 +11,8 @@ provider "azurerm" {
   features {}
 }
 
+# Recuperando valores do tfstate gerado pelo microserviço CORE-IDENTITY
 data "terraform_remote_state" "identity" {
-  backend = "local"   
+  backend = "local"
   config  = { path = "../core-identity/terraform.tfstate" }
 }
