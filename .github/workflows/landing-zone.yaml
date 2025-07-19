@@ -1,0 +1,24 @@
+name: landing-zone
+on:
+  push:
+    paths: [ 'landing-zone/**' ]
+  workflow_dispatch: {}
+
+jobs:
+  Terraform-Backend-Landing:
+    runs-on: ubuntu-latest
+    env:
+      TF_VAR_subscription_id:  ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id:        ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_admin_client_id:  ${{ secrets.ARM_CLIENT_ID }}
+      TF_VAR_admin_client_secret: ${{ secrets.ARM_CLIENT_SECRET }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with: { creds: ${{ secrets.AZURE_CREDENTIALS }} }
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: 1.6.6 }
+
+      - run: terraform -chdir=landing-zone init
+      - run: terraform -chdir=landing-zone apply -auto-approve
