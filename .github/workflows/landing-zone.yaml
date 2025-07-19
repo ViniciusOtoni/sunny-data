@@ -4,7 +4,7 @@ on:
     workflows: ["core-identity"]
     types: [completed]
   workflow_dispatch: {}
-  
+
 permissions:
   contents: read
   id-token: write
@@ -43,9 +43,9 @@ jobs:
 
       # 1) Init / Apply (backend local)
       - name: Terraform Init (local)
-        run: terraform -chdir=landing-zone init
+        run: terraform -chdir=landing-zone init -backend=false
 
-      - name: Terraform Apply (create SA & container)
+      - name: Terraform apply (cria Storage Account & container)
         run: terraform -chdir=landing-zone apply -auto-approve
 
       # 2) Captura outputs da SA criada
