@@ -1,9 +1,9 @@
 name: landing-zone
 on:
   workflow_run:
-    workflows: ["core-identity"]
+    workflows: ["core-identity"]  # Dispara esse workflow após a conclusão do antecessor (CORE-IDENTITY)
     types: [completed]
-  workflow_dispatch: {}
+
 
 permissions:
   contents: read
@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   Migration-Terraform-Backend:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' }} # Valida de a conclusão do workflow foi com status de success
     runs-on: ubuntu-latest
     env:
       TF_VAR_subscription_id:  ${{ secrets.ARM_SUBSCRIPTION_ID }}
@@ -41,23 +41,23 @@ jobs:
         with:
           terraform_version: 1.6.6
 
-      # 1) Init / Apply (backend local)
-      - name: Terraform Init (local)
+      # 1) Init LOCAL (ignora o backend azurerm declarado)
+      - name: Terraform init (backend local)
         run: terraform -chdir=landing-zone init -backend=false
 
       - name: Terraform apply (cria Storage Account & container)
         run: terraform -chdir=landing-zone apply -auto-approve
 
-      # 2) Captura outputs da SA criada
+      # 2) Captura outputs do SA criado
       - name: Read outputs
         id: tfout
         run: |
           SA=$(terraform -chdir=landing-zone output -raw state_sa_name)
           RG=$(terraform -chdir=landing-zone output -raw state_rg_name)
-          echo "sa=$SA" >> $GITHUB_OUTPUT
-          echo "rg=$RG" >> $GITHUB_OUTPUT
+          echo "sa=$SA" >>"$GITHUB_OUTPUT"
+          echo "rg=$RG" >>"$GITHUB_OUTPUT"
 
-      # 3) Migrar state do landing-zone para SA
+      # 3) Migra o state para o backend AZURE
       - name: Migrate landing-zone state to Azure blob
         run: |
           terraform -chdir=landing-zone init \
@@ -66,4 +66,8 @@ jobs:
             -backend-config="resource_group_name=${{ steps.tfout.outputs.rg }}" \
             -backend-config="key=landing.tfstate" \
             -migrate-state
+
+      # 4) Validação do backend remoto
+      - name: Terraform apply (remote backend)
+        run: terraform -chdir=landing-zone apply -auto-approve
 
