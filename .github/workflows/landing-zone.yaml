@@ -3,7 +3,8 @@ on:
   workflow_run:
     workflows: ["core-identity"]
     types: [completed]
-
+  workflow_dispatch: {}
+  
 permissions:
   contents: read
   id-token: write
@@ -66,4 +67,3 @@ jobs:
             -backend-config="key=landing.tfstate" \
             -migrate-state
 
-            
