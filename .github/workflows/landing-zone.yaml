@@ -66,20 +66,4 @@ jobs:
             -backend-config="key=landing.tfstate" \
             -migrate-state
 
-      # 4) Cria container tfstate-core no mesmo SA
-      - name: Create container tfstate-core in Storage Account
-        run: |
-          az storage container create \
-            --name tfstate-core \
-            --account-name ${{ steps.tfout.outputs.sa }} \
-            --auth-mode login
-
-      # 5) Migra o tfstate do core-identity para tfstate-core
-      - name: Migrate core-identity state to Storage Account
-        run: |
-          terraform -chdir=core-identity init \
-            -backend-config="storage_account_name=${{ steps.tfout.outputs.sa }}" \
-            -backend-config="container_name=tfstate-core" \
-            -backend-config="resource_group_name=${{ steps.tfout.outputs.rg }}" \
-            -backend-config="key=core.tfstate" \
-            -migrate-state
+            
