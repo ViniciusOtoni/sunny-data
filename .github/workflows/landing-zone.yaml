@@ -5,7 +5,7 @@ on:
   workflow_dispatch: {}
 
 jobs:
-  Terraform-Backend-Landing:
+  apply-and-migrate:
     runs-on: ubuntu-latest
     env:
       TF_VAR_subscription_id:  ${{ secrets.ARM_SUBSCRIPTION_ID }}
@@ -14,11 +14,38 @@ jobs:
       TF_VAR_admin_client_secret: ${{ secrets.ARM_CLIENT_SECRET }}
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: azure/login@v2
-        with: { creds: ${{ secrets.AZURE_CREDENTIALS }} }
-      - uses: hashicorp/setup-terraform@v3
-        with: { terraform_version: 1.6.6 }
+    - uses: actions/checkout@v4
 
-      - run: terraform -chdir=landing-zone init
-      - run: terraform -chdir=landing-zone apply -auto-approve
+    - name: Azure Login (SPN bootstrap)
+      uses: azure/login@v2
+      with: { creds: ${{ secrets.AZURE_CREDENTIALS }} }
+
+    - uses: hashicorp/setup-terraform@v3
+      with: { terraform_version: 1.6.6 }
+
+    # 1) Init / Apply usando backend local
+    - name: Terraform Init (local)
+      run: terraform -chdir=landing-zone init
+
+    - name: Terraform Apply (create SA & container)
+      run: terraform -chdir=landing-zone apply -auto-approve
+
+   
+    # 2) Captura outputs – nome do Storage Account e RG
+    - name: Read outputs
+      id: tfout
+      run: |
+        SA=$(terraform -chdir=landing-zone output -raw state_sa_name)
+        RG=$(terraform -chdir=landing-zone output -raw state_rg_name)
+        echo "sa=$SA" >> $GITHUB_OUTPUT
+        echo "rg=$RG" >> $GITHUB_OUTPUT
+
+    # 3) Re-init apontando para o backend remoto e migra o tfstate
+    - name: Migrate state to Azure blob
+      run: |
+        terraform -chdir=landing-zone init \
+          -backend-config="storage_account_name=${{ steps.tfout.outputs.sa }}" \
+          -backend-config="container_name=tfstate-landing" \
+          -backend-config="resource_group_name=${{ steps.tfout.outputs.rg }}" \
+          -backend-config="key=landing.tfstate" \
+          -migrate-state -reconfigure
