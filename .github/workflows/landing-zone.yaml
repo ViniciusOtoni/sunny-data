@@ -1,12 +1,18 @@
 name: landing-zone
 on:
-  push:
-    paths:  
-      - 'landing-zone/**' 
-  workflow_dispatch: {}
+  workflow_run:
+    workflows: ["core-identity"]   # dispara após o workflow anterior
+    types: [completed]
+
+# Ler artefato do run anterior
+permissions:
+  contents: read
+  id-token: write
+  actions: read                   
 
 jobs:
   Migration-Terraform-Backend:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }} # Valida de o workflow anterior foi finalizado com sucesso
     runs-on: ubuntu-latest
     env:
       TF_VAR_subscription_id:  ${{ secrets.ARM_SUBSCRIPTION_ID }}
@@ -17,6 +23,15 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    # Recriando a pasta do tfsate através do valor recuperado no artefato
+    - name: Download core-identity state
+      uses: dawidd6/action-download-artifact@v3
+      with:
+          workflow: core-identity
+          run_id:  ${{ github.event.workflow_run.id }}
+          name: tfstate-core
+          path: core-identity 
+
     - name: Azure Login (SPN bootstrap)
       uses: azure/login@v2
       with:
@@ -24,14 +39,7 @@ jobs:
 
     - uses: hashicorp/setup-terraform@v3
       with:
-        terraform_version: 1.6.6
-
-    # Recriando a pasta do tfsate através do valor recuperado no artefato
-    - name: Download core-identity state
-      uses: actions/download-artifact@v4
-      with:
-        name: tfstate-core           
-        path: core-identity          
+        terraform_version: 1.6.6         
 
     # 1) Init / Apply usando backend local
     - name: Terraform Init (local)

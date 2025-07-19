@@ -4,6 +4,12 @@ on:
     paths:
       - 'core-identity/**'
   workflow_dispatch: {}
+  
+# permitir upload de artefatos
+permissions:
+  contents: read
+  id-token: write          
+  actions: write            
 
 jobs:
   Deployment-Core-Ecosystem:
