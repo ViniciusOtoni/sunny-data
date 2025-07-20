@@ -85,6 +85,6 @@ jobs:
       run: |
         terraform -chdir=landing-zone init \
           -backend-config="storage_account_name=${{ steps.tfout.outputs.sa }}" \
-          -backend-config="container_name=tfstate-landing" \
+          -backend-config="container_name=tfstate" \
           -backend-config="key=landing.tfstate" \
           -migrate-state -force-copy
