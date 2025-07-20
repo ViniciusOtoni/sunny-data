@@ -1,0 +1,41 @@
+name: storage-foundation
+on:
+  workflow_run:
+    workflows: ["landing-zone"]
+    types: [completed]
+
+
+permissions:
+  contents: read
+  id-token: write
+  actions: read
+
+jobs:
+  deploy-storage:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    env:
+      TF_VAR_subscription_id:   ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id:         ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_spn_client_id:     ${{ secrets.SPN_CLIENT_ID }}
+      TF_VAR_spn_client_secret: ${{ secrets.SPN_CLIENT_SECRET }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure Login (SPN dinâmica)
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_SPN_CREDENTIALS }} 
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Terraform init
+        run: terraform -chdir=storage-foundation init
+
+      - name: Terraform apply
+        run: terraform -chdir=storage-foundation apply -auto-approve
+
+      

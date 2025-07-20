@@ -88,7 +88,3 @@ jobs:
           -backend-config="container_name=tfstate-landing" \
           -backend-config="key=landing.tfstate" \
           -migrate-state -force-copy
-
-    # validação final
-    - name: Terraform apply (remote backend)
-      run: terraform -chdir=landing-zone apply -auto-approve

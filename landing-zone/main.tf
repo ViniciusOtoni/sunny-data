@@ -19,7 +19,7 @@ resource "azurerm_storage_account" "tfstate" {
 }
 
 resource "azurerm_storage_container" "landing" {
-  name                  = "tfstate-landing"
+  name                  = "tfstate"
   storage_account_name  = azurerm_storage_account.tfstate.name
   container_access_type = "private"
   provider = azurerm.admin
