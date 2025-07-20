@@ -42,8 +42,12 @@ jobs:
     # Esconde o backend azurerm original
     - name: Switch backend to local temporarily
       run: |
-        mv landing-zone/backend.tf landing-zone/backend_remote.bak  
-        echo 'terraform { backend "local" {} }' > landing-zone/backend.tf
+        mv landing-zone/backend.tf landing-zone/backend_remote.bak
+        cat <<EOF > landing-zone/backend.tf
+        terraform {
+          backend "local" {}
+        }
+        EOF
 
     - name: Terraform init (local)
       run: terraform -chdir=landing-zone init
