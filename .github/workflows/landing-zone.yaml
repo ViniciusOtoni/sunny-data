@@ -65,7 +65,7 @@ jobs:
             -backend-config="container_name=tfstate-landing" \
             -backend-config="resource_group_name=${{ steps.tfout.outputs.rg }}" \
             -backend-config="key=landing.tfstate" \
-            -migrate-state
+            -migrate-state -force-copy
 
       # 4) Validação do backend remoto
       - name: Terraform apply (remote backend)
