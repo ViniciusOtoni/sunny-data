@@ -42,7 +42,7 @@ jobs:
     # Esconde o backend azurerm original
     - name: Switch backend to local temporarily
       run: |
-        mv landing-zone/backend.tf landing-zone/backend_remote.tf
+        mv landing-zone/backend.tf landing-zone/backend_remote.bak  
         echo 'terraform { backend "local" {} }' > landing-zone/backend.tf
 
     - name: Terraform init (local)
@@ -57,8 +57,15 @@ jobs:
       run: |
         SA=$(terraform -chdir=landing-zone output -raw state_sa_name)
         RG=$(terraform -chdir=landing-zone output -raw state_rg_name)
-        echo "sa=$SA" >> "$GITHUB_OUTPUT"
-        echo "rg=$RG" >> "$GITHUB_OUTPUT"
+        # pega a chave primária do Storage Account
+        ACCESS_KEY=$(az storage account keys list \
+                      --account-name "$SA" \
+                      --resource-group "$RG" \
+                      --query "[0].value" -o tsv)
+        echo "::add-mask::$ACCESS_KEY"
+        echo "sa=$SA"       >> $GITHUB_OUTPUT
+        echo "rg=$RG"       >> $GITHUB_OUTPUT
+        echo "ackey=$ACCESS_KEY" >> $GITHUB_OUTPU
 
 
     # 2) Migração – backend AZURERM
@@ -66,14 +73,15 @@ jobs:
     # Restaura o backend remoto
     - name: Restore azurerm backend file
       run: |
-        mv landing-zone/backend_remote.tf landing-zone/backend.tf
+        mv landing-zone/backend_remote.bak landing-zone/backend.tf
 
-    - name: Terraform init (migrate to Azure Blob)
+    - name: Migrate landing-zone state
+      env:
+        ARM_ACCESS_KEY: ${{ steps.tfout.outputs.ackey }}
       run: |
         terraform -chdir=landing-zone init \
           -backend-config="storage_account_name=${{ steps.tfout.outputs.sa }}" \
           -backend-config="container_name=tfstate-landing" \
-          -backend-config="resource_group_name=${{ steps.tfout.outputs.rg }}" \
           -backend-config="key=landing.tfstate" \
           -migrate-state -force-copy
 
