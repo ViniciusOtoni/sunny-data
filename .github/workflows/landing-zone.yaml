@@ -57,8 +57,8 @@ jobs:
           echo "sa=$SA" >>"$GITHUB_OUTPUT"
           echo "rg=$RG" >>"$GITHUB_OUTPUT"
 
-      # 3) Migra o state para o backend AZURE
-      - name: Migrate landing-zone state to Azure blob
+      # 3) MIGRA o state para o backend Azurerm  
+      - name: Migrate landing-zone state to Azure Blob
         run: |
           terraform -chdir=landing-zone init \
             -backend-config="storage_account_name=${{ steps.tfout.outputs.sa }}" \
@@ -67,7 +67,14 @@ jobs:
             -backend-config="key=landing.tfstate" \
             -migrate-state -force-copy
 
-      # 4) Validação do backend remoto
-      - name: Terraform apply (remote backend)
-        run: terraform -chdir=landing-zone apply -auto-approve
+      # 4) Re-init só para gravar a config e aplicar (SEM copiar state de novo)
+      - name: Reconfigure backend & apply
+        run: |
+          terraform -chdir=landing-zone init \
+            -backend-config="storage_account_name=${{ steps.tfout.outputs.sa }}" \
+            -backend-config="container_name=tfstate-landing" \
+            -backend-config="resource_group_name=${{ steps.tfout.outputs.rg }}" \
+            -backend-config="key=landing.tfstate" \
+            -reconfigure
+          terraform -chdir=landing-zone apply -auto-approve
 
