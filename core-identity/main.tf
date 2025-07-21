@@ -63,3 +63,10 @@ resource "azurerm_role_assignment" "spn_contributor_datalake" {
   role_definition_name = "Contributor"
   principal_id         = module.service_principal.spn_object_id
 }
+
+resource "azurerm_role_assignment" "spn_uaccess_rg_datalake" {
+  provider             = azurerm.admin
+  scope                = azurerm_resource_group.rg_datalake.id
+  role_definition_name = "User Access Administrator"
+  principal_id         = module.service_principal.spn_object_id
+}
