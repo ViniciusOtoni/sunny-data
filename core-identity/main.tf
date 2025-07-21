@@ -70,14 +70,4 @@ resource "azurerm_role_assignment" "spn_uaccess_rg_datalake" {
   role_definition_name = "User Access Administrator"
   principal_id         = module.service_principal.spn_object_id
   principal_type       = "ServicePrincipal" 
-
-   # Campos que satisfazem a Policy ABAC
-  condition_version = "2.0"
-  condition         = <<COND
-     @{
-       request.context.principalType == "ServicePrincipal"
-     }
-  COND
 }
-
-
