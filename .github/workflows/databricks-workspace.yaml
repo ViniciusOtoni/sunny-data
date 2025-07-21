@@ -1,0 +1,69 @@
+name: databricks-workspace
+on:
+  workflow_run:
+    workflows: ["storage-foundation"]   # dispara quando storage terminar
+    types: [completed]
+
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write
+  actions: read
+
+jobs:
+  deploy-dbx:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+
+    env:
+      TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id:       ${{ secrets.ARM_TENANT_ID }}
+
+    steps:
+
+      - uses: actions/checkout@v4
+
+      # 1) Login com SPN bootstrap (tem Secrets Officer no KV)
+      - name: Azure login (bootstrap)
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}   # JSON da bootstrap
+
+      # 2) Capturar credenciais da SPN dinâmica no AKV
+      - name: Fetch dynamic-SPN creds
+        id: kv
+        run: |
+          KV="akv-medalforge-rbac-core"
+          ID=$(az keyvault secret show --vault-name $KV --name spn-client-id     -o tsv --query value)
+          SC=$(az keyvault secret show --vault-name $KV --name spn-client-secret -o tsv --query value)
+          echo "::add-mask::$SC"
+          echo "TF_VAR_spn_client_id=$ID"     >> $GITHUB_ENV
+          echo "TF_VAR_spn_client_secret=$SC" >> $GITHUB_ENV
+          echo "ARM_CLIENT_ID=$ID"            >> $GITHUB_ENV
+          echo "ARM_CLIENT_SECRET=$SC"        >> $GITHUB_ENV
+          echo "ARM_SUBSCRIPTION_ID=${{ env.TF_VAR_subscription_id }}" >> $GITHUB_ENV
+          echo "ARM_TENANT_ID=${{ env.TF_VAR_tenant_id }}"             >> $GITHUB_ENV
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Terraform init
+        run: terraform -chdir=databricks-workspace init
+
+      - name: Terraform apply
+        run: terraform -chdir=databricks-workspace apply -auto-approve
+
+  # Job 2 – pausa para grant manual
+  await-account-admin-grant:
+    name: "🚦 Aguardar grant account_admin"
+    needs: deploy-dbx
+    runs-on: ubuntu-latest
+    environment: approval-account-admin  o
+    steps:
+      - name: Instruções
+        run: |
+          echo "Abra o Databricks Account Console,"
+          echo "atribua a **SPN dinâmica** como *account_admin*"
+          echo "e clique em 'Approve & deploy' para continuar."
