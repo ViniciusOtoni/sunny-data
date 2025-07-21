@@ -3,7 +3,8 @@ on:
   workflow_run:
     workflows: ["landing-zone"]
     types: [completed]
-
+  
+  workflow_dispatch: {}
 
 permissions:
   contents: read
