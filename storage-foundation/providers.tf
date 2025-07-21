@@ -12,7 +12,7 @@ data "terraform_remote_state" "landing" {
   backend = "azurerm"
   config = {
     storage_account_name = "stmedalforgestate"
-    container_name       = "tfstate-landing"
+    container_name       = "tfstate"
     key                  = "landing.tfstate"
   }
 }
