@@ -15,5 +15,6 @@ data "terraform_remote_state" "landing" {
     container_name       = "tfstate"
     key                  = "landing.tfstate"
     resource_group_name  = "rg-medalforge-core"
+    use_azuread_auth     = true  
   }
 }

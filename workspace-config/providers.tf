@@ -34,5 +34,6 @@ data "terraform_remote_state" "dbx" {
     container_name       = "tfstate"
     key                  = "dbx.tfstate"
     resource_group_name  = "rg-medalforge-core"
+    use_azuread_auth     = true  
   }
 }

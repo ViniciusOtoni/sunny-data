@@ -4,5 +4,6 @@ terraform {
     container_name       = "tfstate"          
     key                  = "storage.tfstate" 
     resource_group_name  = "rg-medalforge-core"
+    use_azuread_auth     = true  
   }
 }
