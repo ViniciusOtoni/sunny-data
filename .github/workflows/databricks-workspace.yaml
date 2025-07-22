@@ -60,7 +60,7 @@ jobs:
     name: "🚦 Aguardar grant account_admin"
     needs: deploy-dbx
     runs-on: ubuntu-latest
-    environment: approval-account-admin  o
+    environment: approval-account-admin
     steps:
       - name: Instruções
         run: |
