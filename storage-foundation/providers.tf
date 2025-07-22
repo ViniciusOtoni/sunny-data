@@ -14,5 +14,6 @@ data "terraform_remote_state" "landing" {
     storage_account_name = "stmedalforgestate"
     container_name       = "tfstate"
     key                  = "landing.tfstate"
+    resource_group_name  = "rg-medalforge-core"
   }
 }

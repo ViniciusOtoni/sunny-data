@@ -14,5 +14,6 @@ data "terraform_remote_state" "storage" {
     storage_account_name = "stmedalforgestate"
     container_name       = "tfstate"
     key                  = "storage.tfstate"
+    resource_group_name  = "rg-medalforge-core"
   }
 }
