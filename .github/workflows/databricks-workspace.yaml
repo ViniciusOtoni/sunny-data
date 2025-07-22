@@ -30,6 +30,10 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}   # JSON da bootstrap
 
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
       # 2) Capturar credenciais da SPN dinâmica no AKV
       - name: Fetch dynamic-SPN creds
         id: kv
@@ -45,9 +49,18 @@ jobs:
           echo "ARM_SUBSCRIPTION_ID=${{ env.TF_VAR_subscription_id }}" >> $GITHUB_ENV
           echo "ARM_TENANT_ID=${{ env.TF_VAR_tenant_id }}"             >> $GITHUB_ENV
 
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.6.6
+      # 3) Obter a Access Key do Storage Account (para o backend)
+      - name: Export ARM_ACCESS_KEY
+        id: sa
+        run: |
+          SA_NAME="stmedalforgestate"
+          RG_NAME=$(az storage account show --name $SA_NAME --query resourceGroup -o tsv)
+          ACCESS_KEY=$(az storage account keys list --account-name $SA_NAME --query "[0].value" -o tsv)
+          echo "::add-mask::$ACCESS_KEY"
+          echo "ARM_ACCESS_KEY=$ACCESS_KEY" >> $GITHUB_ENV
+          
+          echo "rg=$RG_NAME" >> $GITHUB_OUTPUT
+          echo "sa=$SA_NAME" >> $GITHUB_OUTPUT
 
       - name: Terraform init
         run: terraform -chdir=databricks-workspace init
