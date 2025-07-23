@@ -1,5 +1,9 @@
 provider "azurerm" {
-  features {}
+  features {
+    network_watcher {
+      enabled = false 
+    }          
+  }
 }
 
 provider "azurerm" {
@@ -8,7 +12,11 @@ provider "azurerm" {
   client_id       = var.admin_client_id
   client_secret   = var.admin_client_secret
   tenant_id       = var.tenant_id
-  features {}
+  features {
+    network_watcher {
+      enabled = false           
+    }
+  }
 }
 
 # Recuperando valores do tfstate gerado pelo microserviço CORE-IDENTITY

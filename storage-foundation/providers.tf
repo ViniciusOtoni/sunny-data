@@ -4,7 +4,11 @@ provider "azurerm" {
   tenant_id       = var.tenant_id
   client_id       = var.spn_client_id
   client_secret   = var.spn_client_secret
-  features {}
+  features {
+    network_watcher {
+      enabled = false           
+    }
+  }
 }
 
 # lê outputs do landing-zone (já no backend remoto repousado no SA)
