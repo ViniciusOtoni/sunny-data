@@ -96,8 +96,15 @@ jobs:
           ID=$(az keyvault secret show --vault-name $KV --name spn-client-id     -o tsv --query value)
           SC=$(az keyvault secret show --vault-name $KV --name spn-client-secret -o tsv --query value)
           echo "::add-mask::$SC"
+
+          # variáveis TF_
           echo "TF_VAR_spn_client_id=$ID"     >> $GITHUB_ENV
           echo "TF_VAR_spn_client_secret=$SC" >> $GITHUB_ENV
+
+          echo "ARM_CLIENT_ID=$ID"            >> $GITHUB_ENV
+          echo "ARM_CLIENT_SECRET=$SC"        >> $GITHUB_ENV
+          echo "ARM_TENANT_ID=${{ env.TF_VAR_tenant_id }}" >> $GITHUB_ENV
+
 
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -114,7 +121,7 @@ jobs:
   cleanup-network-watcher:
     needs: workspace-config        
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Azure login (bootstrap)
         uses: azure/login@v2

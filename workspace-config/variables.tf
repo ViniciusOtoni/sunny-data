@@ -57,8 +57,23 @@ variable "azure_managed_identity_id" {
 }
 
 # External Locations
-variable "raw_url"    { description = "ABFSS da camada Raw"    type = string }
-variable "bronze_url" { description = "ABFSS da camada Bronze" type = string }
-variable "silver_url" { description = "ABFSS da camada Silver" type = string }
-variable "gold_url"   { description = "ABFSS da camada Gold"   type = string }
+variable "raw_url"    { 
+  description = "ABFSS da camada Raw"    
+  type = string 
+}
+
+variable "bronze_url" { 
+  description = "ABFSS da camada Bronze" 
+  type = string 
+}
+
+variable "silver_url" { 
+  description = "ABFSS da camada Silver" 
+  type = string 
+}
+
+variable "gold_url"   { 
+  description = "ABFSS da camada Gold"   
+  type = string 
+}
 
