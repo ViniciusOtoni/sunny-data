@@ -90,16 +90,18 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       # Captura credenciais da SPN dinâmica no KV
-      - name: Fetch dynamic-SPN creds
+      - name: Fetch dynamic-SPN creds from Key Vault
+        id: kv
         run: |
-          KV="akv-medalforge-rbac-core"
-          ID=$(az keyvault secret show --vault-name $KV --name spn-client-id     -o tsv --query value)
-          SC=$(az keyvault secret show --vault-name $KV --name spn-client-secret -o tsv --query value)
-          echo "::add-mask::$SC"
+          KV_NAME="akv-medalforge-rbac-core" 
+          SPN_ID=$(az keyvault secret show --vault-name $KV_NAME --name spn-client-id     --query value -o tsv)
+          SPN_SECRET=$(az keyvault secret show --vault-name $KV_NAME --name spn-client-secret --query value -o tsv)
 
-          # variáveis TF_
-          echo "TF_VAR_spn_client_id=$ID"     >> $GITHUB_ENV
-          echo "TF_VAR_spn_client_secret=$SC" >> $GITHUB_ENV
+          echo "::add-mask::$SPN_SECRET"
+
+          # Variáveis usadas pelas inputs do módulo
+          echo "TF_VAR_spn_client_id=$SPN_ID"        >> $GITHUB_ENV
+          echo "TF_VAR_spn_client_secret=$SPN_SECRET" >> $GITHUB_ENV
 
           # Variáveis que o provider 'azurerm' reconhece implicitamente
           echo "ARM_CLIENT_ID=$SPN_ID"               >> $GITHUB_ENV
