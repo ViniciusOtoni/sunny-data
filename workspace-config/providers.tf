@@ -1,3 +1,13 @@
+terraform {
+  required_providers {
+    # Padroniza para o provider oficial da Databricks
+    databricks = {
+      source  = "databricks/databricks"
+      version = "~> 1.0"   # ou a versão que você preferir
+    }
+  }
+}
+
 provider "databricks" {
   alias = "spn"
   host  = data.terraform_remote_state.dbx.outputs.workspace_url

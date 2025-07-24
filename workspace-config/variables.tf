@@ -26,7 +26,7 @@ variable "databricks_account_id" {
 variable "location" {
   description = "Região do Databricks Account (ex.: brazilsouth)"
   type        = string
-  default     = brazilsouth
+  default     = "brazilsouth"
 }
 
 variable "workspace_url" {
