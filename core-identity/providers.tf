@@ -1,6 +1,7 @@
 # Default = SPN bootstrap (credentials in AZURE_CREDENTIALS secret)
 provider "azurerm" {
   features {}
+}
 
 # Alias admin = conta “admin SPN” com Owner na subscription
 provider "azurerm" {
