@@ -108,3 +108,20 @@ jobs:
 
       - name: Terraform apply (workspace-config)
         run: terraform -chdir=workspace-config apply -auto-approve
+      
+ 
+  # Job 4 – Desabilitar a opção de Network Watcher na região BrazilSouth
+  cleanup-network-watcher:
+    needs: workspace-config        
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Azure login (bootstrap)
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Disable Network Watcher & delete RG
+        run: |
+          az network watcher configure --enabled false
+          az group delete -n NetworkWatcherRG --yes --no-wait || true

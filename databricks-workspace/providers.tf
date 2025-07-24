@@ -4,11 +4,7 @@ provider "azurerm" {
   tenant_id       = var.tenant_id
   client_id       = var.spn_client_id
   client_secret   = var.spn_client_secret
-  features {
-    network_watcher {
-      enabled = false           
-    }
-  }
+  features {}
 }
 
 # Realizar leitura do tfstate do microserviço anterior (STORAGE-FOUNDATION)
