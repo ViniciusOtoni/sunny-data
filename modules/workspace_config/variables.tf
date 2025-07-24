@@ -3,11 +3,6 @@ variable "workspace_url" {
   type        = string
 }
 
-variable "workspace_id" {
-  description = "ID da Databricks Workspace"
-  type        = string
-}
-
 variable "metastore_name" {
   description = "Nome a ser usado no Metastore do Unity Catalog"
   type        = string
