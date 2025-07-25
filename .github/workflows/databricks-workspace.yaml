@@ -49,6 +49,11 @@ jobs:
           echo "ARM_SUBSCRIPTION_ID=$TF_VAR_subscription_id"           >> $GITHUB_ENV
           echo "ARM_TENANT_ID=$TF_VAR_tenant_id"                       >> $GITHUB_ENV
 
+          # Variáveis para autenticar o provider Databricks
+          echo "AZURE_CLIENT_ID=$SPN_ID"          >> $GITHUB_ENV
+          echo "AZURE_CLIENT_SECRET=$SPN_SECRET"      >> $GITHUB_ENV
+          echo "AZURE_TENANT_ID=$TF_VAR_tenant_id"           >> $GITHUB_ENV
+
       - name: Terraform init
         run: terraform -chdir=databricks-workspace init
 
@@ -128,6 +133,12 @@ jobs:
           echo "ARM_CLIENT_SECRET=$SPN_SECRET"       >> $GITHUB_ENV
           echo "ARM_SUBSCRIPTION_ID=$TF_VAR_subscription_id"           >> $GITHUB_ENV
           echo "ARM_TENANT_ID=$TF_VAR_tenant_id"                       >> $GITHUB_ENV
+
+          # Variáveis para autenticar o provider Databricks
+          echo "AZURE_CLIENT_ID=$SPN_ID"          >> $GITHUB_ENV
+          echo "AZURE_CLIENT_SECRET=$SPN_SECRET"      >> $GITHUB_ENV
+          echo "AZURE_TENANT_ID=$TF_VAR_tenant_id"           >> $GITHUB_ENV
+
 
       - name: Terraform init (workspace-config)
         run: terraform -chdir=workspace-config init
