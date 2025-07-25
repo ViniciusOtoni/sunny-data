@@ -32,3 +32,12 @@ resource "azurerm_role_assignment" "spn_sa_owner" {
   principal_id         = local.spn_object
   provider             = azurerm.admin
 }
+
+# Role para listar as Keys do SA
+resource "azurerm_role_assignment" "spn_listkeys" {
+  scope                = azurerm_storage_account.tfstate.id
+  role_definition_name = "Storage Account Key Operator Service Role"
+  principal_id         = local.spn_object
+  provider             = azurerm.admin
+}
+

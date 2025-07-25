@@ -50,8 +50,8 @@ jobs:
           # Variáveis que o provider 'azurerm' reconhece implicitamente
           echo "ARM_CLIENT_ID=$SPN_ID"               >> $GITHUB_ENV
           echo "ARM_CLIENT_SECRET=$SPN_SECRET"       >> $GITHUB_ENV
-          echo "ARM_SUBSCRIPTION_ID=${{ env.TF_VAR_subscription_id }}" >> $GITHUB_ENV
-          echo "ARM_TENANT_ID=${{ env.TF_VAR_tenant_id }}"             >> $GITHUB_ENV
+          echo "ARM_SUBSCRIPTION_ID=$TF_VAR_subscription_id"           >> $GITHUB_ENV
+          echo "ARM_TENANT_ID=$TF_VAR_tenant_id"                       >> $GITHUB_ENV
 
 
       # 2) Terraform (autenticado como SPN dinâmica) + backend autenticado
