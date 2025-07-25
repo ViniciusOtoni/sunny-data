@@ -1,7 +1,7 @@
 # extrai o ID numérico do workspace
 locals {
-  matches              = regexall("adb-(\\d+)\\.", var.workspace_url)
-  workspace_id_numeric = tonumber(local.matches[0][1])
+  # pega a primeira sequência de dígitos depois de "adb-"
+  workspace_id_numeric = tonumber(regex("adb-([0-9]+)", var.workspace_url)[0])
 }
 
 # Delay artificial para Sync de role "account_admin"
