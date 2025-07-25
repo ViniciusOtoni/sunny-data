@@ -1,7 +1,8 @@
 name: databricks-workspace
+
 on:
   workflow_run:
-    workflows: ["storage-foundation"]   # dispara quando storage terminar
+    workflows: ["storage-foundation"] 
     types: [completed]
 
   workflow_dispatch: {}
@@ -11,73 +12,136 @@ permissions:
   id-token: write
   actions: read
 
+
+# 1. Criação do workspace Databricks + SPN dinâmica
+
 jobs:
   deploy-dbx:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-
     env:
       TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
       TF_VAR_tenant_id:       ${{ secrets.ARM_TENANT_ID }}
-
     steps:
-
       - uses: actions/checkout@v4
 
-      # 1) Login com SPN bootstrap (tem Secrets Officer no KV)
       - name: Azure login (bootstrap)
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}   # JSON da bootstrap
-
-      - uses: hashicorp/setup-terraform@v3
+      
+      # Instala o Terraform CLI versão 1.6.6
+      - name: Setup Terraform 1.6.6
+        uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.6
 
-      # 2) Capturar credenciais da SPN dinâmica no AKV
+      # Busca client_id / secret da SPN dinâmica no Key Vault
       - name: Fetch dynamic-SPN creds
         id: kv
         run: |
           KV="akv-medalforge-rbac-core"
-          ID=$(az keyvault secret show --vault-name $KV --name spn-client-id     -o tsv --query value)
-          SC=$(az keyvault secret show --vault-name $KV --name spn-client-secret -o tsv --query value)
-          echo "::add-mask::$SC"
-          echo "TF_VAR_spn_client_id=$ID"     >> $GITHUB_ENV
-          echo "TF_VAR_spn_client_secret=$SC" >> $GITHUB_ENV
-          echo "ARM_CLIENT_ID=$ID"            >> $GITHUB_ENV
-          echo "ARM_CLIENT_SECRET=$SC"        >> $GITHUB_ENV
-          echo "ARM_SUBSCRIPTION_ID=$TF_VAR_subscription_id"           >> $GITHUB_ENV
-          echo "ARM_TENANT_ID=$TF_VAR_tenant_id"                       >> $GITHUB_ENV
+          SPN_ID=$(az keyvault secret show --vault-name "$KV" --name spn-client-id     -o tsv --query value)
+          SPN_SECRET=$(az keyvault secret show --vault-name "$KV" --name spn-client-secret -o tsv --query value)
+          echo "::add-mask::$SPN_SECRET"
 
-          # Variáveis para autenticar o provider Databricks
-          echo "AZURE_CLIENT_ID=$SPN_ID"          >> $GITHUB_ENV
-          echo "AZURE_CLIENT_SECRET=$SPN_SECRET"      >> $GITHUB_ENV
-          echo "AZURE_TENANT_ID=$TF_VAR_tenant_id"           >> $GITHUB_ENV
+          # — variáveis TF_ que vão para o módulo
+          echo "TF_VAR_spn_client_id=$SPN_ID"        >> $GITHUB_ENV
+          echo "TF_VAR_spn_client_secret=$SPN_SECRET" >> $GITHUB_ENV
 
-      - name: Terraform init
+          # — variáveis ARM_* (backend AzureRM)
+          echo "ARM_CLIENT_ID=$SPN_ID"               >> $GITHUB_ENV
+          echo "ARM_CLIENT_SECRET=$SPN_SECRET"       >> $GITHUB_ENV
+          echo "ARM_SUBSCRIPTION_ID=$TF_VAR_subscription_id" >> $GITHUB_ENV
+          echo "ARM_TENANT_ID=$TF_VAR_tenant_id"             >> $GITHUB_ENV
+
+          # — variáveis AZURE_* para o provider Databricks
+          echo "AZURE_CLIENT_ID=$SPN_ID"             >> $GITHUB_ENV
+          echo "AZURE_CLIENT_SECRET=$SPN_SECRET"     >> $GITHUB_ENV
+          echo "AZURE_TENANT_ID=$TF_VAR_tenant_id"   >> $GITHUB_ENV
+          unset AZURE_FEDERATED_TOKEN_FILE || true   # garante client-secret
+
+      - name: Terraform init (workspace)
         run: terraform -chdir=databricks-workspace init
 
-      - name: Terraform apply
+      - name: Terraform apply (workspace)
         run: terraform -chdir=databricks-workspace apply -auto-approve
 
-  # Job 2 – pausa para grant manual
+
+# 2. Pausa manual para dar account_admin
+
   await-account-admin-grant:
     name: "🚦 Aguardar grant account_admin"
     needs: deploy-dbx
     runs-on: ubuntu-latest
     environment: approval-account-admin
     steps:
-      - name: Instruções
-        run: |
+      - run: |
           echo "Abra o Databricks Account Console,"
-          echo "atribua a **SPN dinâmica** como *account_admin*"
+          echo "atribua a SPN dinâmica como account_admin"
           echo "e clique em 'Approve & deploy' para continuar."
-  
-  # Job 3 – Desabilitar a opção de Network Watcher na região BrazilSouth
-  cleanup-network-watcher:
-    needs: workspace-config        
-    runs-on: ubuntu-latest
 
+
+# 3. Configuração do Unity Catalog
+
+  workspace-config:
+    name: workspace-config
+    needs: await-account-admin-grant
+    runs-on: ubuntu-latest
+    env:
+      TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id:       ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_databricks_account_id: ${{ secrets.ARM_ACCOUNT_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (bootstrap)
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup Terraform 1.6.6
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      # Busca novamente as credenciais da SPN dinâmica 
+      - name: Fetch dynamic-SPN creds (UC)
+        id: kv_uc
+        run: |
+          KV="akv-medalforge-rbac-core"
+          SPN_ID=$(az keyvault secret show --vault-name "$KV" --name spn-client-id     -o tsv --query value)
+          SPN_SECRET=$(az keyvault secret show --vault-name "$KV" --name spn-client-secret -o tsv --query value)
+          echo "::add-mask::$SPN_SECRET"
+
+          # — variáveis TF_ que vão para o módulo
+          echo "TF_VAR_spn_client_id=$SPN_ID"         >> $GITHUB_ENV
+          echo "TF_VAR_spn_client_secret=$SPN_SECRET" >> $GITHUB_ENV
+
+          # — variáveis ARM_* (backend AzureRM)
+          echo "ARM_CLIENT_ID=$SPN_ID"               >> $GITHUB_ENV
+          echo "ARM_CLIENT_SECRET=$SPN_SECRET"       >> $GITHUB_ENV
+          echo "ARM_SUBSCRIPTION_ID=$TF_VAR_subscription_id" >> $GITHUB_ENV
+          echo "ARM_TENANT_ID=$TF_VAR_tenant_id"             >> $GITHUB_ENV
+
+          # — variáveis AZURE_* para o provider Databricks
+          echo "AZURE_CLIENT_ID=$SPN_ID"             >> $GITHUB_ENV
+          echo "AZURE_CLIENT_SECRET=$SPN_SECRET"     >> $GITHUB_ENV
+          echo "AZURE_TENANT_ID=$TF_VAR_tenant_id"   >> $GITHUB_ENV
+          unset AZURE_FEDERATED_TOKEN_FILE || true
+
+      - name: Terraform init (UC)
+        run: terraform -chdir=workspace-config init
+
+      - name: Terraform apply (UC)
+        run: terraform -chdir=workspace-config apply -auto-approve
+
+# 4. Cleanup Network Watcher
+
+  cleanup-network-watcher:
+    needs: workspace-config
+    runs-on: ubuntu-latest
     steps:
       - name: Azure login (bootstrap)
         uses: azure/login@v2
@@ -86,65 +150,5 @@ jobs:
 
       - name: Disable Network Watcher & delete RG
         run: |
-          az network watcher configure --enabled false
+          az network watcher configure --locations brazilsouth --enabled false
           az group delete -n NetworkWatcherRG --yes --no-wait || true
-  
-  # Job 4 – configurações de Unity Catalog / workspace-config
-
-  workspace-config:
-    name: workspace-config
-    needs: await-account-admin-grant          # roda só depois da aprovação
-    runs-on: ubuntu-latest
-
-    env:
-      TF_VAR_subscription_id:        ${{ secrets.ARM_SUBSCRIPTION_ID }}
-      TF_VAR_tenant_id:              ${{ secrets.ARM_TENANT_ID }}
-      TF_VAR_databricks_account_id:  ${{ secrets.ARM_ACCOUNT_ID }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      # login com SPN bootstrap (pode buscar o KV novamente)
-      - name: Azure login (bootstrap)
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.6.6
-
-      # Captura credenciais da SPN dinâmica no KV
-      - name: Fetch dynamic-SPN creds from Key Vault
-        id: kv
-        run: |
-          KV_NAME="akv-medalforge-rbac-core" 
-          SPN_ID=$(az keyvault secret show --vault-name $KV_NAME --name spn-client-id     --query value -o tsv)
-          SPN_SECRET=$(az keyvault secret show --vault-name $KV_NAME --name spn-client-secret --query value -o tsv)
-
-          echo "::add-mask::$SPN_SECRET"
-
-          # Variáveis usadas pelas inputs do módulo
-          echo "TF_VAR_spn_client_id=$SPN_ID"        >> $GITHUB_ENV
-          echo "TF_VAR_spn_client_secret=$SPN_SECRET" >> $GITHUB_ENV
-
-          # Variáveis que o provider 'azurerm' reconhece implicitamente
-          echo "ARM_CLIENT_ID=$SPN_ID"               >> $GITHUB_ENV
-          echo "ARM_CLIENT_SECRET=$SPN_SECRET"       >> $GITHUB_ENV
-          echo "ARM_SUBSCRIPTION_ID=$TF_VAR_subscription_id"           >> $GITHUB_ENV
-          echo "ARM_TENANT_ID=$TF_VAR_tenant_id"                       >> $GITHUB_ENV
-
-          # Variáveis para autenticar o provider Databricks
-          echo "AZURE_CLIENT_ID=$SPN_ID"          >> $GITHUB_ENV
-          echo "AZURE_CLIENT_SECRET=$SPN_SECRET"      >> $GITHUB_ENV
-          echo "AZURE_TENANT_ID=$TF_VAR_tenant_id"           >> $GITHUB_ENV
-
-
-      - name: Terraform init (workspace-config)
-        run: terraform -chdir=workspace-config init
-
-      - name: Terraform apply (workspace-config)
-        run: terraform -chdir=workspace-config apply -auto-approve
-      
- 
-  
