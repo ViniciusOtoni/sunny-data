@@ -131,6 +131,10 @@ jobs:
           echo "AZURE_TENANT_ID=$TF_VAR_tenant_id"   >> $GITHUB_ENV
           unset AZURE_FEDERATED_TOKEN_FILE || true
 
+          # Removendo token OIDC
+          echo "AZURE_FEDERATED_TOKEN_FILE=" >> $GITHUB_ENV
+
+
       - name: Terraform init (UC)
         run: terraform -chdir=workspace-config init
 
