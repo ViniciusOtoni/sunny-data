@@ -67,8 +67,25 @@ jobs:
       - name: Terraform apply (workspace)
         run: terraform -chdir=databricks-workspace apply -auto-approve
 
+  
+# 2. Cleanup Network Watcher
 
-# 2. Pausa manual para dar account_admin
+  cleanup-network-watcher:
+    needs: deploy-dbx
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login (bootstrap)
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Disable Network Watcher & delete RG
+        run: |
+          az network watcher configure --locations brazilsouth --enabled false
+          az group delete -n NetworkWatcherRG --yes --no-wait || true
+
+
+# 3. Pausa manual para dar account_admin
 
   await-account-admin-grant:
     name: "🚦 Aguardar grant account_admin"
@@ -82,7 +99,7 @@ jobs:
           echo "e clique em 'Approve & deploy' para continuar."
 
 
-# 3. Configuração do Unity Catalog
+# 4. Configuração do Unity Catalog
 
   workspace-config:
     name: workspace-config
@@ -141,18 +158,4 @@ jobs:
       - name: Terraform apply (UC)
         run: terraform -chdir=workspace-config apply -auto-approve
 
-# 4. Cleanup Network Watcher
 
-  cleanup-network-watcher:
-    needs: workspace-config
-    runs-on: ubuntu-latest
-    steps:
-      - name: Azure login (bootstrap)
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Disable Network Watcher & delete RG
-        run: |
-          az network watcher configure --locations brazilsouth --enabled false
-          az group delete -n NetworkWatcherRG --yes --no-wait || true
