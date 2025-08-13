@@ -24,7 +24,7 @@ resource "databricks_metastore" "uc" {
   ]
 }
 
-# Attach ao workspace o catálogo
+# Attach ao workspace o metastore
 resource "databricks_metastore_assignment" "attach" {
   provider     = databricks.spn
   workspace_id = local.workspace_id_numeric
@@ -39,7 +39,7 @@ resource "null_resource" "wait_for_assignment" {
 
 # Storage Credential 
 resource "databricks_storage_credential" "uc" {
-  provider = databricks.spn
+  provider = databricks.account
   name     = var.uc_storage_credential_name
 
    
@@ -63,7 +63,7 @@ resource "null_resource" "wait_for_credential" {
 
 # External locations
 resource "databricks_external_location" "raw" {
-  provider        = databricks.spn
+  provider        = databricks.account
   name            = "raw"
   url             = var.raw_url
   credential_name = databricks_storage_credential.uc.name
@@ -73,7 +73,7 @@ resource "databricks_external_location" "raw" {
 }
 
 resource "databricks_external_location" "bronze" {
-  provider        = databricks.spn
+  provider        = databricks.account
   name            = "bronze"
   url             = var.bronze_url
   credential_name = databricks_storage_credential.uc.name
@@ -83,7 +83,7 @@ resource "databricks_external_location" "bronze" {
 }
 
 resource "databricks_external_location" "silver" {
-  provider        = databricks.spn
+  provider        = databricks.account
   name            = "silver"
   url             = var.silver_url
   credential_name = databricks_storage_credential.uc.name
@@ -93,11 +93,117 @@ resource "databricks_external_location" "silver" {
 }
 
 resource "databricks_external_location" "gold" {
-  provider        = databricks.spn
+  provider        = databricks.account
   name            = "gold"
   url             = var.gold_url
   credential_name = databricks_storage_credential.uc.name
 
 
   depends_on = [null_resource.wait_for_credential]
+}
+
+# Criação dos Grupos de Acesso:
+
+resource "databricks_group" "platform_engineers" {
+  provider = databricks.spn
+  display_name = "data-platform-engineers"
+}
+resource "databricks_group" "consumers" {
+  provider = databricks.spn
+  display_name = "data-consumers"
+}
+
+# Catálogos
+
+resource "databricks_catalog" "bronze" {
+  provider = databricks.spn
+  name        = "bronze"
+  comment     = "Camada Bronze"
+  isolation_mode = "OPEN" # ou ISOLATED, se quiser mais rígido
+}
+
+resource "databricks_catalog" "silver" {
+  provider = databricks.spn
+  name        = "silver"
+  comment     = "Camada Silver"
+  isolation_mode = "OPEN"
+}
+
+resource "databricks_catalog" "monitoring" {
+  provider = databricks.spn
+  name        = "monitoring"
+  comment     = "Telemetria e observabilidade do lake"
+  isolation_mode = "OPEN"
+}
+
+# GRANTS
+
+resource "databricks_grants" "bronze" {
+  provider = databricks.spn
+  catalog = databricks_catalog.bronze.name
+  grant {
+    principal  = databricks_group.platform_engineers.display_name
+    privileges = ["USE_CATALOG", "CREATE", "READ_VOLUME", "WRITE_VOLUME"]
+  }
+  grant {
+    principal  = databricks_group.consumers.display_name
+    privileges = ["USE_CATALOG"] # sem SELECT por padrão na bronze
+  }
+}
+
+resource "databricks_grants" "silver" {
+  provider = databricks.spn
+  catalog = databricks_catalog.silver.name
+  grant {
+    principal  = databricks_group.platform_engineers.display_name
+    privileges = ["USE_CATALOG", "CREATE", "READ_VOLUME", "WRITE_VOLUME"]
+  }
+  grant {
+    principal  = databricks_group.consumers.display_name
+    privileges = ["USE_CATALOG", "SELECT"]
+  }
+}
+
+resource "databricks_grants" "monitoring" {
+  provider = databricks.spn
+  catalog = databricks_catalog.monitoring.name
+  grant {
+    principal  = databricks_group.platform_engineers.display_name
+    privileges = ["USE_CATALOG", "CREATE"]
+  }
+  grant {
+    principal  = databricks_group.consumers.display_name
+    privileges = ["USE_CATALOG", "SELECT"]
+  }
+}
+
+
+# Criação Warehouse:
+
+resource "databricks_sql_warehouse" "serverless_wh" {
+  provider = databricks.spn
+  name                = "wh_serverless_explore"
+  cluster_size        = "2X-Small"
+  enable_serverless_compute = true
+  auto_stop_mins      = 15
+  warehouse_type      = "PRO"
+
+  tags = {
+    owner = "data-platform"
+    tier  = "explore"
+  }
+}
+
+# Permissões no warehouse
+resource "databricks_permissions" "wh_perms" {
+  provider = databricks.spn
+  warehouse_id = databricks_sql_warehouse.serverless_wh.id
+  access_control {
+    group_name       = databricks_group.platform_engineers.display_name
+    permission_level = "CAN_MANAGE"
+  }
+  access_control {
+    group_name       = databricks_group.consumers.display_name
+    permission_level = "CAN_USE"
+  }
 }

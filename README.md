@@ -1,1 +1,0 @@
-# medalforge-plataform
