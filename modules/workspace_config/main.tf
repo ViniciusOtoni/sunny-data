@@ -164,6 +164,19 @@ resource "databricks_service_principal" "automation" {
   display_name   = "spn-dynamic-automation"
 }
 
+# Busca o grupo 'admins' 
+data "databricks_group" "admins" {
+  provider     = databricks.spn
+  display_name = "admins"
+}
+
+resource "databricks_group_member" "spn_is_admin" {
+  provider  = databricks.spn
+  group_id  = data.databricks_group.admins.id
+  member_id = databricks_service_principal.automation.id
+}
+
+
 resource "databricks_entitlements" "automation" {
   provider             = databricks.spn
   service_principal_id = databricks_service_principal.automation.id
@@ -185,9 +198,10 @@ resource "databricks_sql_endpoint" "serverless_wh" {
   name                      = "wh_serverless_explore"
   cluster_size              = "2X-Small"
   auto_stop_mins            = 15
-  enable_serverless_compute = true  
+  enable_serverless_compute = true
   depends_on = [
-    databricks_entitlements.automation, 
+    databricks_entitlements.automation,
+    databricks_group_member.spn_is_admin, 
     time_sleep.after_assignment
   ]
 }
@@ -197,10 +211,9 @@ resource "databricks_permissions" "wh_perms" {
   provider        = databricks.spn
   sql_endpoint_id = databricks_sql_endpoint.serverless_wh.id
 
-  # Garante que a própria SPN tenha Manage
   access_control {
-    service_principal_name = var.spn_client_id
-    permission_level       = "CAN_MANAGE"
+    service_principal_id = databricks_service_principal.automation.id
+    permission_level     = "CAN_MANAGE"
   }
   access_control {
     group_name       = databricks_group.platform_engineers.display_name
