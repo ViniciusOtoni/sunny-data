@@ -1,75 +1,59 @@
-# extrai o ID numérico do workspace
 locals {
-  # pega a primeira sequência de dígitos depois de "adb-"
   workspace_id_numeric = tonumber(regex("adb-([0-9]+)", var.workspace_url)[0])
 }
 
-# Delay artificial para Sync de role "account_admin"
-resource "null_resource" "sync_account_admin" {
-
-  provisioner "local-exec" {
-    command = "echo 'Esperando sync da role de account admin...' && sleep 200"
-  }
+resource "time_sleep" "after_admin_grant" {
+  create_duration = "60s"
 }
 
-# Criar Metastore no Databricks
+# --- Metastore (ACCOUNT) ---
 resource "databricks_metastore" "uc" {
   provider     = databricks.account
   name         = var.metastore_name
   storage_root = var.uc_storage_root
   region       = var.databricks_region
 
-  depends_on = [
-    null_resource.sync_account_admin,
-  ]
+  depends_on = [time_sleep.after_admin_grant]
 }
 
-# Attach ao workspace o metastore
+# --- Assignment do metastore ao workspace (ACCOUNT) ---
 resource "databricks_metastore_assignment" "attach" {
-  provider     = databricks.spn
+  provider     = databricks.account
   workspace_id = local.workspace_id_numeric
   metastore_id = databricks_metastore.uc.id
 }
 
-resource "null_resource" "wait_for_assignment" {
-  depends_on = [databricks_metastore_assignment.attach]
+# Espera curta para propagação do attach antes de criar catálogos / credenciais
+resource "time_sleep" "after_assignment" {
+  depends_on      = [databricks_metastore_assignment.attach]
+  create_duration = "90s"
 }
 
-
-
-# Storage Credential 
+# --- Storage Credential (ACCOUNT) ---
 resource "databricks_storage_credential" "uc" {
   provider = databricks.account
   name     = var.uc_storage_credential_name
 
-   
   azure_managed_identity {
     access_connector_id = var.azure_managed_identity_id
   }
 
-  depends_on = [
-    null_resource.wait_for_assignment,
-  ]
+  depends_on = [time_sleep.after_assignment]
 }
 
-# Delay artificial após a criação do Storage Credential
-resource "null_resource" "wait_for_credential" {
-  depends_on = [databricks_storage_credential.uc]
-
-  provisioner "local-exec" {
-    command = "echo 'Esperando propagação do Storage Credential...' && sleep 120"
-  }
+# Espera curta para propagação do credential
+resource "time_sleep" "after_credential" {
+  depends_on      = [databricks_storage_credential.uc]
+  create_duration = "60s"
 }
 
-# External locations
+# --- External Locations (ACCOUNT) ---
 resource "databricks_external_location" "raw" {
   provider        = databricks.account
   name            = "raw"
   url             = var.raw_url
   credential_name = databricks_storage_credential.uc.name
-
-
-  depends_on = [null_resource.wait_for_credential]
+  depends_on      = [time_sleep.after_credential]
 }
 
 resource "databricks_external_location" "bronze" {
@@ -77,9 +61,7 @@ resource "databricks_external_location" "bronze" {
   name            = "bronze"
   url             = var.bronze_url
   credential_name = databricks_storage_credential.uc.name
-  
-
-  depends_on = [null_resource.wait_for_credential]
+  depends_on      = [time_sleep.after_credential]
 }
 
 resource "databricks_external_location" "silver" {
@@ -87,9 +69,7 @@ resource "databricks_external_location" "silver" {
   name            = "silver"
   url             = var.silver_url
   credential_name = databricks_storage_credential.uc.name
- 
-
-  depends_on = [null_resource.wait_for_credential]
+  depends_on      = [time_sleep.after_credential]
 }
 
 resource "databricks_external_location" "gold" {
@@ -97,63 +77,62 @@ resource "databricks_external_location" "gold" {
   name            = "gold"
   url             = var.gold_url
   credential_name = databricks_storage_credential.uc.name
-
-
-  depends_on = [null_resource.wait_for_credential]
+  depends_on      = [time_sleep.after_credential]
 }
 
-# Criação dos Grupos de Acesso:
-
+# --- Grupos (WORKSPACE/SPN) ---
 resource "databricks_group" "platform_engineers" {
-  provider = databricks.spn
+  provider     = databricks.spn
   display_name = "data-platform-engineers"
 }
+
 resource "databricks_group" "consumers" {
-  provider = databricks.spn
+  provider     = databricks.spn
   display_name = "data-consumers"
 }
 
-# Catálogos
-
+# --- Catálogos (WORKSPACE/SPN) ---
 resource "databricks_catalog" "bronze" {
-  provider = databricks.spn
-  name        = "bronze"
-  comment     = "Camada Bronze"
-  isolation_mode = "OPEN" # ou ISOLATED, se quiser mais rígido
+  provider       = databricks.spn
+  name           = "bronze"
+  comment        = "Camada Bronze"
+  isolation_mode = "OPEN"
+  depends_on     = [time_sleep.after_assignment]
 }
 
 resource "databricks_catalog" "silver" {
-  provider = databricks.spn
-  name        = "silver"
-  comment     = "Camada Silver"
+  provider       = databricks.spn
+  name           = "silver"
+  comment        = "Camada Silver"
   isolation_mode = "OPEN"
+  depends_on     = [time_sleep.after_assignment]
 }
 
 resource "databricks_catalog" "monitoring" {
-  provider = databricks.spn
-  name        = "monitoring"
-  comment     = "Telemetria e observabilidade do lake"
+  provider       = databricks.spn
+  name           = "monitoring"
+  comment        = "Telemetria e observabilidade do lake"
   isolation_mode = "OPEN"
+  depends_on     = [time_sleep.after_assignment]
 }
 
-# GRANTS
-
+# --- Grants dos catálogos (WORKSPACE/SPN) ---
 resource "databricks_grants" "bronze" {
   provider = databricks.spn
-  catalog = databricks_catalog.bronze.name
+  catalog  = databricks_catalog.bronze.name
   grant {
     principal  = databricks_group.platform_engineers.display_name
     privileges = ["USE_CATALOG", "CREATE", "READ_VOLUME", "WRITE_VOLUME"]
   }
   grant {
     principal  = databricks_group.consumers.display_name
-    privileges = ["USE_CATALOG"] # sem SELECT por padrão na bronze
+    privileges = ["USE_CATALOG"]
   }
 }
 
 resource "databricks_grants" "silver" {
   provider = databricks.spn
-  catalog = databricks_catalog.silver.name
+  catalog  = databricks_catalog.silver.name
   grant {
     principal  = databricks_group.platform_engineers.display_name
     privileges = ["USE_CATALOG", "CREATE", "READ_VOLUME", "WRITE_VOLUME"]
@@ -166,7 +145,7 @@ resource "databricks_grants" "silver" {
 
 resource "databricks_grants" "monitoring" {
   provider = databricks.spn
-  catalog = databricks_catalog.monitoring.name
+  catalog  = databricks_catalog.monitoring.name
   grant {
     principal  = databricks_group.platform_engineers.display_name
     privileges = ["USE_CATALOG", "CREATE"]
@@ -177,22 +156,19 @@ resource "databricks_grants" "monitoring" {
   }
 }
 
-
-# Criação Warehouse:
-
+# --- SQL Warehouse (endpoint) (WORKSPACE/SPN) ---
 resource "databricks_sql_endpoint" "serverless_wh" {
   provider                  = databricks.spn
   name                      = "wh_serverless_explore"
   cluster_size              = "2X-Small"
   auto_stop_mins            = 15
-  enable_serverless_compute = true     
-
+  enable_serverless_compute = true   
+  depends_on                = [time_sleep.after_assignment]
 }
 
-# Permissões no warehouse
+# --- Permissões no Warehouse (WORKSPACE/SPN) ---
 resource "databricks_permissions" "wh_perms" {
-
-  provider = databricks.spn
+  provider        = databricks.spn
   sql_endpoint_id = databricks_sql_endpoint.serverless_wh.id
 
   access_control {
