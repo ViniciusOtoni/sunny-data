@@ -2,10 +2,10 @@ locals {
   workspace_id_numeric      = tonumber(regex("adb-([0-9]+)", var.workspace_url)[0])
 
   # Privilégios padronizados (nível Catálogo)
-  engineer_catalog_privs    = ["USE_CATALOG","CREATE_SCHEMA","READ_VOLUME","WRITE_VOLUME"]
-  consumer_bronze_privs     = ["USE_CATALOG"]
-  consumer_silver_privs     = ["USE_CATALOG","SELECT"]
-  engineer_monitoring_privs = ["USE_CATALOG","CREATE_SCHEMA"]
+  engineer_catalog_privs    = ["BROWSE","USE_CATALOG","CREATE_SCHEMA","READ_VOLUME","WRITE_VOLUME"]
+  consumer_bronze_privs     = ["BROWSE","USE_CATALOG"]
+  consumer_silver_privs     = ["BROWSE","USE_CATALOG","SELECT"]
+  engineer_monitoring_privs = ["BROWSE","USE_CATALOG","CREATE_SCHEMA"]
 }
 
 resource "time_sleep" "after_admin_grant" {
