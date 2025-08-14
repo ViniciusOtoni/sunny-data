@@ -186,11 +186,7 @@ resource "databricks_sql_endpoint" "serverless_wh" {
   cluster_size              = "2X-Small"
   auto_stop_mins            = 15
   enable_serverless_compute = true     
-  
-  tags = { 
-    owner = "data-platform", 
-    tier = "explore" 
-  }
+
 }
 
 # Permissões no warehouse
