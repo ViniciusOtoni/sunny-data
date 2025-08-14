@@ -1,13 +1,12 @@
 locals {
-  workspace_id_numeric = tonumber(regex("adb-([0-9]+)", var.workspace_url)[0])
+  workspace_id_numeric      = tonumber(regex("adb-([0-9]+)", var.workspace_url)[0])
 
   # Privilégios padronizados (nível Catálogo)
-  engineer_catalog_privs = ["USE_CATALOG","CREATE_SCHEMA","READ_VOLUME","WRITE_VOLUME"]
-  consumer_bronze_privs  = ["USE_CATALOG"]
-  consumer_silver_privs  = ["USE_CATALOG","SELECT"]
+  engineer_catalog_privs    = ["USE_CATALOG","CREATE_SCHEMA","READ_VOLUME","WRITE_VOLUME"]
+  consumer_bronze_privs     = ["USE_CATALOG"]
+  consumer_silver_privs     = ["USE_CATALOG","SELECT"]
   engineer_monitoring_privs = ["USE_CATALOG","CREATE_SCHEMA"]
 }
-
 
 resource "time_sleep" "after_admin_grant" {
   create_duration = "60s"
@@ -35,7 +34,7 @@ resource "time_sleep" "after_assignment" {
   create_duration = "90s"
 }
 
-# --- Grupos (ACCOUNT / SCIM na conta, visíveis ao UC) ---
+# --- Grupos (ACCOUNT / SCIM na conta) ---
 resource "databricks_group" "platform_engineers" {
   provider     = databricks.account
   display_name = "data-platform-engineers"
@@ -46,36 +45,37 @@ resource "databricks_group" "consumers" {
   display_name = "data-consumers"
 }
 
-# SPN já existe no workspace; resolvemos a identidade dela para membership
+# SPN já existe no workspace; resolvemos a identidade (para grants/membership)
 data "databricks_service_principal" "automation" {
   provider       = databricks.spn
   application_id = var.spn_client_id
 }
 
-# Adiciona a SPN ao grupo de engenheiros (na CONTA)
+# Coloca a SPN no grupo de engenheiros (na CONTA)
 resource "databricks_group_member" "spn_platform_engineers_account" {
   provider  = databricks.account
   group_id  = databricks_group.platform_engineers.id
   member_id = data.databricks_service_principal.automation.id
 }
 
-# Pequeno buffer para SCIM/grupos
+# Pequeno buffer de SCIM
 resource "time_sleep" "after_groups" {
   depends_on      = [databricks_group.platform_engineers, databricks_group.consumers, databricks_group_member.spn_platform_engineers_account]
   create_duration = "10s"
 }
 
-# --- Grants no Metastore (precisa para criar catálogos) ---
+# --- Grants no Metastore (WORKSPACE/SPN) ---
 resource "databricks_grants" "metastore" {
-  provider  = databricks.account
+  provider  = databricks.spn
   metastore = databricks_metastore.uc.id
 
+  # Quem poderá criar catálogos:
   grant {
     principal  = databricks_group.platform_engineers.display_name
     privileges = ["CREATE_CATALOG"]
   }
 
-  depends_on = [time_sleep.after_groups, time_sleep.after_assignment]
+  depends_on = [time_sleep.after_assignment, time_sleep.after_groups]
 }
 
 # --- Storage Credential (WORKSPACE / SPN) ---
@@ -86,7 +86,7 @@ resource "databricks_storage_credential" "uc" {
   azure_managed_identity {
     access_connector_id = var.azure_managed_identity_id
   }
-  depends_on = [databricks_grants.metastore]  
+  depends_on = [databricks_grants.metastore]
 }
 
 # Espera para propagação do credential
@@ -154,7 +154,7 @@ resource "databricks_catalog" "monitoring" {
 }
 
 # --- Grants dos catálogos (WORKSPACE/SPN) ---
-resource "databricks_grants" "bronze" {
+resource "databricks_grants" "bronze_grants" {
   provider   = databricks.spn
   catalog    = databricks_catalog.bronze.name
   depends_on = [databricks_group.platform_engineers, databricks_group.consumers]
@@ -169,7 +169,7 @@ resource "databricks_grants" "bronze" {
   }
 }
 
-resource "databricks_grants" "silver" {
+resource "databricks_grants" "silver_grants" {
   provider   = databricks.spn
   catalog    = databricks_catalog.silver.name
   depends_on = [databricks_group.platform_engineers, databricks_group.consumers]
@@ -184,7 +184,7 @@ resource "databricks_grants" "silver" {
   }
 }
 
-resource "databricks_grants" "monitoring" {
+resource "databricks_grants" "monitoring_grants" {
   provider   = databricks.spn
   catalog    = databricks_catalog.monitoring.name
   depends_on = [databricks_group.platform_engineers, databricks_group.consumers]
