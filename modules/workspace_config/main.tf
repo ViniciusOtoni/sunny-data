@@ -29,9 +29,9 @@ resource "time_sleep" "after_assignment" {
   create_duration = "90s"
 }
 
-# --- Storage Credential (ACCOUNT) ---
+# --- Storage Credential (WORKSPACE / SPN) ---
 resource "databricks_storage_credential" "uc" {
-  provider = databricks.account
+  provider = databricks.spn
   name     = var.uc_storage_credential_name
 
   azure_managed_identity {
@@ -47,9 +47,9 @@ resource "time_sleep" "after_credential" {
   create_duration = "60s"
 }
 
-# --- External Locations (ACCOUNT) ---
+# --- External Locations (WORKSPACE / SPN) ---
 resource "databricks_external_location" "raw" {
-  provider        = databricks.account
+  provider        = databricks.spn
   name            = "raw"
   url             = var.raw_url
   credential_name = databricks_storage_credential.uc.name
@@ -57,7 +57,7 @@ resource "databricks_external_location" "raw" {
 }
 
 resource "databricks_external_location" "bronze" {
-  provider        = databricks.account
+  provider        = databricks.spn
   name            = "bronze"
   url             = var.bronze_url
   credential_name = databricks_storage_credential.uc.name
@@ -65,7 +65,7 @@ resource "databricks_external_location" "bronze" {
 }
 
 resource "databricks_external_location" "silver" {
-  provider        = databricks.account
+  provider        = databricks.spn
   name            = "silver"
   url             = var.silver_url
   credential_name = databricks_storage_credential.uc.name
@@ -73,22 +73,27 @@ resource "databricks_external_location" "silver" {
 }
 
 resource "databricks_external_location" "gold" {
-  provider        = databricks.account
+  provider        = databricks.spn
   name            = "gold"
   url             = var.gold_url
   credential_name = databricks_storage_credential.uc.name
   depends_on      = [time_sleep.after_credential]
 }
 
-# --- Grupos (WORKSPACE/SPN) ---
+# --- Grupos ( ACCOUNT ) ---
 resource "databricks_group" "platform_engineers" {
-  provider     = databricks.spn
+  provider     = databricks.account
   display_name = "data-platform-engineers"
 }
 
 resource "databricks_group" "consumers" {
-  provider     = databricks.spn
+  provider     = databricks.account
   display_name = "data-consumers"
+}
+
+resource "time_sleep" "after_groups" {
+  depends_on      = [databricks_group.platform_engineers, databricks_group.consumers]
+  create_duration = "10s"
 }
 
 # --- Catálogos (WORKSPACE/SPN) ---
@@ -97,7 +102,7 @@ resource "databricks_catalog" "bronze" {
   name           = "bronze"
   comment        = "Camada Bronze"
   isolation_mode = "OPEN"
-  depends_on     = [time_sleep.after_assignment]
+  depends_on     = [time_sleep.after_assignment, time_sleep.after_groups]
 }
 
 resource "databricks_catalog" "silver" {
@@ -105,7 +110,7 @@ resource "databricks_catalog" "silver" {
   name           = "silver"
   comment        = "Camada Silver"
   isolation_mode = "OPEN"
-  depends_on     = [time_sleep.after_assignment]
+  depends_on     = [time_sleep.after_assignment, time_sleep.after_groups]
 }
 
 resource "databricks_catalog" "monitoring" {
@@ -113,13 +118,15 @@ resource "databricks_catalog" "monitoring" {
   name           = "monitoring"
   comment        = "Telemetria e observabilidade do lake"
   isolation_mode = "OPEN"
-  depends_on     = [time_sleep.after_assignment]
+  depends_on     = [time_sleep.after_assignment, time_sleep.after_groups]
 }
 
 # --- Grants dos catálogos (WORKSPACE/SPN) ---
 resource "databricks_grants" "bronze" {
   provider = databricks.spn
   catalog  = databricks_catalog.bronze.name
+  depends_on = [databricks_group.platform_engineers, databricks_group.consumers]
+
   grant {
     principal  = databricks_group.platform_engineers.display_name
     privileges = ["USE_CATALOG", "CREATE", "READ_VOLUME", "WRITE_VOLUME"]
@@ -133,6 +140,8 @@ resource "databricks_grants" "bronze" {
 resource "databricks_grants" "silver" {
   provider = databricks.spn
   catalog  = databricks_catalog.silver.name
+  depends_on = [databricks_group.platform_engineers, databricks_group.consumers]
+
   grant {
     principal  = databricks_group.platform_engineers.display_name
     privileges = ["USE_CATALOG", "CREATE", "READ_VOLUME", "WRITE_VOLUME"]
@@ -146,6 +155,8 @@ resource "databricks_grants" "silver" {
 resource "databricks_grants" "monitoring" {
   provider = databricks.spn
   catalog  = databricks_catalog.monitoring.name
+  depends_on = [databricks_group.platform_engineers, databricks_group.consumers]
+
   grant {
     principal  = databricks_group.platform_engineers.display_name
     privileges = ["USE_CATALOG", "CREATE"]
