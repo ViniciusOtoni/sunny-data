@@ -180,17 +180,16 @@ resource "databricks_grants" "monitoring" {
 
 # Criação Warehouse:
 
-resource "databricks_sql_warehouse" "serverless_wh" {
-  provider = databricks.spn
-  name                = "wh_serverless_explore"
-  cluster_size        = "2X-Small"
-  enable_serverless_compute = true
-  auto_stop_mins      = 15
-  warehouse_type      = "PRO"
-
-  tags = {
-    owner = "data-platform"
-    tier  = "explore"
+resource "databricks_sql_endpoint" "serverless_wh" {
+  provider                  = databricks.spn
+  name                      = "wh_serverless_explore"
+  cluster_size              = "2X-Small"
+  auto_stop_mins            = 15
+  enable_serverless_compute = true     
+  
+  tags = { 
+    owner = "data-platform", 
+    tier = "explore" 
   }
 }
 
@@ -198,7 +197,8 @@ resource "databricks_sql_warehouse" "serverless_wh" {
 resource "databricks_permissions" "wh_perms" {
 
   provider = databricks.spn
-  warehouse_id = databricks_sql_warehouse.serverless_wh.id
+  sql_endpoint_id = databricks_sql_endpoint.serverless_wh.id
+
   access_control {
     group_name       = databricks_group.platform_engineers.display_name
     permission_level = "CAN_MANAGE"
