@@ -153,7 +153,7 @@ jobs:
 
 
       - name: Terraform init (UC)
-        run: terraform -chdir=workspace-config init
+        run: terraform -chdir=workspace-config init -upgrade -reconfigure
 
       - name: Terraform apply (UC)
         run: terraform -chdir=workspace-config apply -auto-approve
