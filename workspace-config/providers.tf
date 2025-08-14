@@ -3,7 +3,7 @@ terraform {
     # Padroniza para o provider oficial da Databricks
     databricks = {
       source  = "databricks/databricks"
-      version = "~> 1.50"   
+      version = "~> 1.22"   
     }
   }
 }

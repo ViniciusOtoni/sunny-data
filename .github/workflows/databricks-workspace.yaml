@@ -123,12 +123,6 @@ jobs:
         with:
           terraform_version: 1.6.6
 
-      - name: Terraform init (UC)
-        run: terraform -chdir=workspace-config init -upgrade
-
-      - name: Terraform apply (UC)
-        run: terraform -chdir=workspace-config apply -auto-approve
-
       # Busca novamente as credenciais da SPN dinâmica 
       - name: Fetch dynamic-SPN creds (UC)
         id: kv_uc

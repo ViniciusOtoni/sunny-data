@@ -196,7 +196,7 @@ resource "databricks_sql_warehouse" "serverless_wh" {
 
 # Permissões no warehouse
 resource "databricks_permissions" "wh_perms" {
-  provider = databricks.spn
+
   warehouse_id = databricks_sql_warehouse.serverless_wh.id
   access_control {
     group_name       = databricks_group.platform_engineers.display_name
