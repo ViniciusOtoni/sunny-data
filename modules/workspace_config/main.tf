@@ -158,39 +158,13 @@ resource "databricks_grants" "monitoring" {
 
 # --- (NOVO) SPN no workspace + Entitlements (WORKSPACE/SPN) ---
 
-resource "databricks_service_principal" "automation" {
+data "databricks_service_principal" "automation" {
   provider       = databricks.spn
   application_id = var.spn_client_id
-  display_name   = "spn-dynamic-automation"
-}
-
-# Busca o grupo 'admins' 
-data "databricks_group" "admins" {
-  provider     = databricks.spn
-  display_name = "admins"
-}
-
-resource "databricks_group_member" "spn_is_admin" {
-  provider  = databricks.spn
-  group_id  = data.databricks_group.admins.id
-  member_id = databricks_service_principal.automation.id
 }
 
 
-resource "databricks_entitlements" "automation" {
-  provider             = databricks.spn
-  service_principal_id = databricks_service_principal.automation.id
 
-  workspace_access      = true
-  databricks_sql_access = true
-  allow_cluster_create  = true
-}
-
-resource "databricks_group_member" "spn_platform_engineers" {
-  provider  = databricks.spn
-  group_id  = databricks_group.platform_engineers.id
-  member_id = databricks_service_principal.automation.id
-}
 
 # --- SQL Warehouse (endpoint) (WORKSPACE/SPN) ---
 resource "databricks_sql_endpoint" "serverless_wh" {
@@ -200,8 +174,6 @@ resource "databricks_sql_endpoint" "serverless_wh" {
   auto_stop_mins            = 15
   enable_serverless_compute = true
   depends_on = [
-    databricks_entitlements.automation,
-    databricks_group_member.spn_is_admin, 
     time_sleep.after_assignment
   ]
 }
@@ -212,7 +184,7 @@ resource "databricks_permissions" "wh_perms" {
   sql_endpoint_id = databricks_sql_endpoint.serverless_wh.id
 
   access_control {
-    service_principal_id = databricks_service_principal.automation.id
+    service_principal_id = data.databricks_service_principal.automation.id
     permission_level     = "CAN_MANAGE"
   }
   access_control {
