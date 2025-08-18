@@ -1,0 +1,43 @@
+name: aad-sync
+on:
+  workflow_run:
+    workflows: ["databricks-workspace"]  # roda após a workspace criada (ordem lógica do seu pipeline)
+    types: [completed]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write
+  actions: read
+
+jobs:
+  aad-sync:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success') }}
+    runs-on: ubuntu-latest
+    env:
+      TF_VAR_subscription_id:     ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id:           ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_admin_client_id:     ${{ secrets.ARM_CLIENT_ID }}           
+      TF_VAR_admin_client_secret: ${{ secrets.ARM_CLIENT_SECRET }}
+      TF_VAR_kv_name:             akv-medalforge-rbac-core
+      TF_VAR_kv_rg_name:          rg-medalforge-core
+      TF_VAR_scim_secret_name:    dbx-account-scim-token                  
+      TF_VAR_account_scim_url:    ${{ secrets.DBX_ACCOUNT_SCIM_URL }}     
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login (bootstrap)
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Terraform init (aad-sync)
+        run: terraform -chdir=aad-sync init
+
+      - name: Terraform apply (aad-sync)
+        run: terraform -chdir=aad-sync apply -auto-approve

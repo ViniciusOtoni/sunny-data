@@ -35,12 +35,12 @@ resource "time_sleep" "after_assignment" {
 }
 
 # --- Grupos (ACCOUNT / SCIM na conta) ---
-resource "databricks_group" "platform_engineers" {
+data "databricks_group" "platform_engineers" {
   provider     = databricks.account
   display_name = "data-platform-engineers"
 }
 
-resource "databricks_group" "consumers" {
+data "databricks_group" "consumers" {
   provider     = databricks.account
   display_name = "data-consumers"
 }
