@@ -19,7 +19,10 @@ data "azuread_application_template" "dbx_scim" {
 resource "azuread_application" "scim_app" {
   display_name = "dbx-account-scim"
   template_id  = data.azuread_application_template.dbx_scim.template_id
-  feature_tags { enterprise = true, gallery = true }
+  feature_tags { 
+                  enterprise = true, 
+                  gallery = true 
+                }
   providers = { azuread = azuread.admin }
 }
 
@@ -32,9 +35,18 @@ resource "azuread_service_principal" "scim_sp" {
 # 3) Segredos do job de provisionamento (SCIM BaseAddress + SecretToken)
 resource "azuread_synchronization_secret" "scim_creds" {
   service_principal_id = azuread_service_principal.scim_sp.id
-  credential { key = "BaseAddress" value = var.account_scim_url }
-  credential { key = "SecretToken" value = data.azurerm_key_vault_secret.scim_token.value }
-  credential { key = "SyncAll"     value = "false" } # sincroniza só “assigned”
+  credential { 
+    key = "BaseAddress" 
+    value = var.account_scim_url 
+  }
+  credential { 
+    key = "SecretToken" 
+    value = data.azurerm_key_vault_secret.scim_token.value 
+  }
+  credential { 
+    key = "SyncAll"     
+    value = "false" 
+  } # sincroniza só “assigned”
   providers = { azuread = azuread.admin }
 }
 
