@@ -134,7 +134,7 @@ resource "azuread_synchronization_job_provision_on_demand" "kick_groups" {
   synchronization_job_id = azuread_synchronization_job.scim_job.id
 
   parameter {
-    rule_id = "scoping"
+    rule_id = "provisioningScope"
 
     subject {
       object_id        = each.value.object_id
