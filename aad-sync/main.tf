@@ -40,23 +40,30 @@ resource "azuread_application" "scim_app" {
   provider = azuread.admin
 }
 
-# Pequeno buffer para o Entra criar o Service Principal do app acima
+# Buffer para o Entra materializar o Service Principal
 resource "time_sleep" "after_app" {
   depends_on      = [azuread_application.scim_app]
-  create_duration = "20s"
+  create_duration = "60s"
 }
 
-# O Service Principal (Enterprise App) é criado automaticamente pelo Entra
-# Fazemos lookup via data source (em vez de tentar criar)
+# Lookup do Service Principal (Enterprise App) criado automaticamente
 data "azuread_service_principal" "scim_sp" {
   client_id  = azuread_application.scim_app.client_id
   provider   = azuread.admin
   depends_on = [time_sleep.after_app]
 }
 
-# 3) Segredos do job de provisionamento (SCIM BaseAddress + SecretToken)
-# - BaseAddress: vem de var.account_scim_url
-# - SecretToken: lido do KV via data.azurerm_key_vault_secret.scim_token (definido em providers.tf)
+# 3) Job de sincronização (modelo “databricks”) - criar ANTES dos secrets
+resource "azuread_synchronization_job" "scim_job" {
+  service_principal_id = data.azuread_service_principal.scim_sp.id
+  template_id          = "databricks"
+  enabled              = true
+  provider             = azuread.admin
+}
+
+# 4) Segredos do job de provisionamento (SCIM BaseAddress + SecretToken)
+# - BaseAddress: var.account_scim_url (Account SCIM URL)
+# - SecretToken: data.azurerm_key_vault_secret.scim_token.value (SCIM token no KV)
 resource "azuread_synchronization_secret" "scim_creds" {
   service_principal_id = data.azuread_service_principal.scim_sp.id
 
@@ -73,11 +80,12 @@ resource "azuread_synchronization_secret" "scim_creds" {
     value = "false" # sincroniza só “assigned”
   }
 
-  provider = azuread.admin
+  provider   = azuread.admin
+  depends_on = [azuread_synchronization_job.scim_job]
 }
 
-# 4) Escopo: atribuir grupos ao Enterprise App (role “User”)
-# App role "User" com fallback seguro caso o nome varie ou ainda não tenha propagado
+# 5) Escopo: atribuir grupos ao Enterprise App (role “User”)
+# Fallback seguro caso o nome varie ou ainda não tenha propagado
 locals {
   user_role_id = length(values(data.azuread_service_principal.scim_sp.app_role_ids)) > 0 ? coalesce(
     lookup(data.azuread_service_principal.scim_sp.app_role_ids, "User", null),
@@ -93,14 +101,4 @@ resource "azuread_app_role_assignment" "assign_groups" {
   provider            = azuread.admin
 
   depends_on = [azuread_synchronization_secret.scim_creds]
-}
-
-# 5) Job de sincronização (modelo “databricks”)
-resource "azuread_synchronization_job" "scim_job" {
-  service_principal_id = data.azuread_service_principal.scim_sp.id
-  template_id          = "databricks"
-  enabled              = true
-  provider             = azuread.admin
-
-  depends_on = [azuread_app_role_assignment.assign_groups]
 }
