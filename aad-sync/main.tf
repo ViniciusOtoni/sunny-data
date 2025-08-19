@@ -12,9 +12,6 @@ terraform {
     databricks = {
       source = "databricks/databricks"
     }
-    null = {
-      source = "hashicorp/null"
-    }
   }
 }
 
@@ -128,69 +125,29 @@ resource "azuread_group_member" "dynamic_spn_in_groups" {
   depends_on = [azuread_app_role_assignment.assign_groups]
 }
 
-# 7) Aguardar (polling) os grupos surgirem no Databricks Account via SCIM
-#    - Consulta o endpoint Account SCIM /Groups com o token e a BaseAddress
-#    - Evita depender de sleeps longos/ciclos de 20–40min
-resource "null_resource" "wait_scim_groups" {
-  for_each = azuread_group.aad_groups
-
-  triggers = {
-    group_name   = each.key
-    scim_url     = var.account_scim_url
-    token_hash   = sha1(data.azurerm_key_vault_secret.scim_token.value)
-    after_assign = azuread_app_role_assignment.assign_groups[each.key].id
-  }
-
-  provisioner "local-exec" {
-    interpreter = ["/bin/bash", "-lc"]
-    environment = {
-      SCIM_URL   = var.account_scim_url
-      SCIM_TOKEN = data.azurerm_key_vault_secret.scim_token.value
-      GROUP_NAME = each.key
-      TIMEOUT    = try(var.scim_group_wait_timeout, 600) # 10min default
-    }
-    command = <<'BASH'
-set -euo pipefail
-url="${SCIM_URL%/}/Groups?filter=displayName%20eq%20%22${GROUP_NAME}%22&count=1"
-deadline=$((SECONDS + TIMEOUT))
-echo ">> Esperando grupo '${GROUP_NAME}' aparecer no Account via SCIM..."
-while true; do
-  code=$(curl -sS -o /tmp/resp.json -w "%{http_code}" \
-    -H "Authorization: Bearer ${SCIM_TOKEN}" \
-    -H "Content-Type: application/scim+json" \
-    "$url")
-  if [ "$code" = "200" ] && jq -e '.totalResults>=1' /tmp/resp.json >/dev/null 2>&1; then
-    echo ">> Grupo '${GROUP_NAME}' presente no Account."
-    break
-  fi
-  if [ $SECONDS -ge $deadline ]; then
-    echo "ERRO: Timeout aguardando grupo '${GROUP_NAME}' no SCIM. Última resposta:"
-    cat /tmp/resp.json || true
-    exit 1
-  fi
-  sleep 15
-done
-BASH
-  }
-
-  depends_on = [azuread_group_member.dynamic_spn_in_groups]
+# 7) Espera fixa para o ciclo de provisionamento (SCIM → Account)
+#    Ajuste se necessário (ex.: "900s" = 15 min)
+resource "time_sleep" "wait_scim_to_account" {
+  depends_on      = [azuread_group_member.dynamic_spn_in_groups]
+  create_duration = "160s"
 }
 
-# 8) Resolver e vincular a SPN dinâmica aos grupos do Databricks Account
-#    - Só após confirmação (polling) de que os grupos existem no Account
+# 8) (Account) Adicionar a SPN dinâmica aos grupos do Databricks Account
+#     - Resolver grupos por display_name no Account (já criados pelo SCIM)
 data "databricks_group" "account_groups" {
   for_each     = azuread_group.aad_groups
   provider     = databricks.account
   display_name = each.key
-  depends_on   = [null_resource.wait_scim_groups]
+  depends_on   = [time_sleep.wait_scim_to_account]
 }
 
-# SPN dinâmica já existe no Account (account_admin): fazemos apenas lookup
+#     - SPN dinâmica já existe no Account (account_admin): apenas lookup
 data "databricks_service_principal" "dynamic" {
   provider       = databricks.account
   application_id = var.dbx_spn_client_id
 }
 
+#     - Vincular SPN aos grupos do Account
 resource "databricks_group_member" "dynamic_spn_in_account_groups" {
   for_each  = data.databricks_group.account_groups
   provider  = databricks.account
