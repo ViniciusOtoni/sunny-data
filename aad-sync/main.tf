@@ -129,11 +129,20 @@ resource "azuread_group_member" "dynamic_spn_in_groups" {
 
 
 resource "azuread_synchronization_job_provision_on_demand" "kick_groups" {
-  for_each             = azuread_group.aad_groups
-  service_principal_id = data.azuread_service_principal.scim_sp.id
-  rule_id              = "scoping"
-  subject_id           = each.value.object_id
-  provider             = azuread.admin
-  
-  depends_on           = [azuread_group_member.dynamic_spn_in_groups]
+  for_each               = azuread_group.aad_groups
+  service_principal_id   = data.azuread_service_principal.scim_sp.id
+  synchronization_job_id = azuread_synchronization_job.scim_job.id
+
+  parameter {
+    name  = "ruleId"
+    value = "scoping"
+  }
+
+  parameter {
+    name  = "subjectId"
+    value = each.value.object_id
+  }
+
+  provider   = azuread.admin
+  depends_on = [azuread_group_member.dynamic_spn_in_groups]
 }
