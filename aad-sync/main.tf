@@ -9,6 +9,9 @@ terraform {
     time = {
       source = "hashicorp/time"
     }
+    databricks = {
+      source = "databricks/databricks"
+    }
   }
 }
 
@@ -63,7 +66,7 @@ resource "azuread_synchronization_job" "scim_job" {
 }
 
 # 4) Segredos do job de provisionamento (SCIM BaseAddress + SecretToken)
-# - BaseAddress: vem de var.account_scim_url (outra opção é ler do KV em providers.tf)
+# - BaseAddress: vem de var.account_scim_url 
 # - SecretToken: lido do KV via data.azurerm_key_vault_secret.scim_token (definido em providers.tf)
 resource "azuread_synchronization_secret" "scim_creds" {
   service_principal_id = data.azuread_service_principal.scim_sp.id
@@ -111,7 +114,7 @@ resource "azuread_app_role_assignment" "assign_groups" {
   depends_on = [time_sleep.before_assignments]
 }
 
-# 6) Adicionar a SPN DINÂMICA como membro de TODOS os grupos (no final)
+# 6) Adicionar a SPN DINÂMICA como membro de TODOS os grupos no AAD (no final)
 #    - Resolvemos a SPN dinâmica lendo o client_id do KV e fazendo lookup no Entra
 data "azuread_service_principal" "dynamic_spn" {
   client_id = data.azurerm_key_vault_secret.dynamic_spn_client_id.value
@@ -119,29 +122,44 @@ data "azuread_service_principal" "dynamic_spn" {
 }
 
 resource "azuread_group_member" "dynamic_spn_in_groups" {
-  for_each          = azuread_group.aad_groups
-  group_object_id   = each.value.object_id
-  member_object_id  = data.azuread_service_principal.dynamic_spn.object_id
-  provider          = azuread.admin
+  for_each         = azuread_group.aad_groups
+  group_object_id  = each.value.object_id
+  member_object_id = data.azuread_service_principal.dynamic_spn.object_id
+  provider         = azuread.admin
 
   depends_on = [azuread_app_role_assignment.assign_groups]
 }
 
+# 7) (Account) Garantir a SPN dinâmica e colocá-la nos grupos do Databricks Account
+#    - SCIM não provisiona service principals no Databricks. Criamos/gerenciamos via provider Databricks (account scope).
 
-resource "azuread_synchronization_job_provision_on_demand" "kick_groups" {
-  for_each               = azuread_group.aad_groups
-  service_principal_id   = data.azuread_service_principal.scim_sp.id
-  synchronization_job_id = azuread_synchronization_job.scim_job.id
+# Aguardar um pouco para os grupos aparecerem no Account após o SCIM
+resource "time_sleep" "after_scim_assignments" {
+  depends_on      = [azuread_group_member.dynamic_spn_in_groups]
+  create_duration = "60s"
+}
 
-  parameter {
-    rule_id = "provisioningScope"
+# Resolver os grupos no Account pelo display_name (igual ao AAD)
+data "databricks_group" "account_groups" {
+  for_each     = azuread_group.aad_groups
+  provider     = databricks.account
+  display_name = each.key
+  depends_on   = [time_sleep.after_scim_assignments]
+}
 
-    subject {
-      object_id        = each.value.object_id
-      object_type_name = "Group"
-    }
-  }
+# Garantir a SPN dinâmica como Service Principal no Account (cria se não existir)
+resource "databricks_service_principal" "dynamic" {
+  provider       = databricks.account
+  application_id = var.dbx_spn_client_id
+  display_name   = "datamaster-spn"
+}
 
-  provider   = azuread.admin
-  depends_on = [azuread_group_member.dynamic_spn_in_groups]
+# Adicionar a SPN dinâmica como membro de cada grupo do Account
+resource "databricks_group_member" "dynamic_spn_in_account_groups" {
+  for_each  = data.databricks_group.account_groups
+  provider  = databricks.account
+  group_id  = each.value.id
+  member_id = databricks_service_principal.dynamic.id
+
+  depends_on = [databricks_service_principal.dynamic]
 }

@@ -8,6 +8,25 @@ variable "admin_client_secret" {
     sensitive = true 
 }
 
+
+variable "databricks_account_id" {
+  type        = string
+  sensitive   = true
+  description = "ID do Databricks Account"
+}
+
+variable "dbx_spn_client_id" {
+  type        = string
+  description = "Client ID da SPN dinâmica (account_admin)"
+}
+
+variable "dbx_spn_client_secret" {
+  type      = string
+  sensitive = true
+  description = "Client Secret da SPN dinâmica"
+}
+
+
 # Key Vault onde está o SCIM token
 variable "kv_name"         { type = string }        
 variable "kv_rg_name"      { type = string }          
