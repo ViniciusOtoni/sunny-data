@@ -28,3 +28,11 @@ data "azurerm_key_vault_secret" "scim_token" {
   key_vault_id = data.azurerm_key_vault.kv.id
 }
 
+
+# Client ID da SPN dinâmica armazenado no mesmo KV (criado no core-identity)
+data "azurerm_key_vault_secret" "dynamic_spn_client_id" {
+  provider     = azurerm.admin
+  name         = "spn-client-id"
+  key_vault_id = data.azurerm_key_vault.kv.id
+}
+

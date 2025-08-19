@@ -110,3 +110,30 @@ resource "azuread_app_role_assignment" "assign_groups" {
 
   depends_on = [time_sleep.before_assignments]
 }
+
+# 6) Adicionar a SPN DINÂMICA como membro de TODOS os grupos (no final)
+#    - Resolvemos a SPN dinâmica lendo o client_id do KV e fazendo lookup no Entra
+data "azuread_service_principal" "dynamic_spn" {
+  client_id = data.azurerm_key_vault_secret.dynamic_spn_client_id.value
+  provider  = azuread.admin
+}
+
+resource "azuread_group_member" "dynamic_spn_in_groups" {
+  for_each          = azuread_group.aad_groups
+  group_object_id   = each.value.object_id
+  member_object_id  = data.azuread_service_principal.dynamic_spn.object_id
+  provider          = azuread.admin
+
+  depends_on = [azuread_app_role_assignment.assign_groups]
+}
+
+
+resource "azuread_synchronization_job_provision_on_demand" "kick_groups" {
+  for_each             = azuread_group.aad_groups
+  service_principal_id = data.azuread_service_principal.scim_sp.id
+  rule_id              = "scoping"
+  subject_id           = each.value.object_id
+  provider             = azuread.admin
+  
+  depends_on           = [azuread_group_member.dynamic_spn_in_groups]
+}
