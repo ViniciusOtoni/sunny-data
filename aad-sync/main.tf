@@ -49,13 +49,13 @@ resource "time_sleep" "after_app" {
 # O Service Principal (Enterprise App) é criado automaticamente pelo Entra
 # Fazemos lookup via data source (em vez de tentar criar)
 data "azuread_service_principal" "scim_sp" {
-  client_id = azuread_application.scim_app.client_id
-  provider  = azuread.admin
+  client_id  = azuread_application.scim_app.client_id
+  provider   = azuread.admin
   depends_on = [time_sleep.after_app]
 }
 
 # 3) Segredos do job de provisionamento (SCIM BaseAddress + SecretToken)
-# - BaseAddress: vem de var.account_scim_url (outra opção é ler do KV em providers.tf)
+# - BaseAddress: vem de var.account_scim_url
 # - SecretToken: lido do KV via data.azurerm_key_vault_secret.scim_token (definido em providers.tf)
 resource "azuread_synchronization_secret" "scim_creds" {
   service_principal_id = data.azuread_service_principal.scim_sp.id
@@ -77,12 +77,12 @@ resource "azuread_synchronization_secret" "scim_creds" {
 }
 
 # 4) Escopo: atribuir grupos ao Enterprise App (role “User”)
-# App role "User" com fallback seguro caso o nome varie
+# App role "User" com fallback seguro caso o nome varie ou ainda não tenha propagado
 locals {
-  user_role_id = coalesce(
+  user_role_id = length(values(data.azuread_service_principal.scim_sp.app_role_ids)) > 0 ? coalesce(
     lookup(data.azuread_service_principal.scim_sp.app_role_ids, "User", null),
     try(element(values(data.azuread_service_principal.scim_sp.app_role_ids), 0), null)
-  )
+  ) : "00000000-0000-0000-0000-000000000000"
 }
 
 resource "azuread_app_role_assignment" "assign_groups" {
@@ -104,4 +104,3 @@ resource "azuread_synchronization_job" "scim_job" {
 
   depends_on = [azuread_app_role_assignment.assign_groups]
 }
-
