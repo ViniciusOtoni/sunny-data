@@ -40,13 +40,14 @@ resource "azuread_application" "scim_app" {
   provider = azuread.admin
 }
 
-# Buffer para o Entra materializar o Service Principal
+# Pequeno buffer para o Entra criar o Service Principal do app acima
 resource "time_sleep" "after_app" {
   depends_on      = [azuread_application.scim_app]
   create_duration = "60s"
 }
 
-# Lookup do Service Principal (Enterprise App) criado automaticamente
+# O Service Principal (Enterprise App) é criado automaticamente pelo Entra
+# Fazemos lookup via data source (em vez de tentar criar)
 data "azuread_service_principal" "scim_sp" {
   client_id  = azuread_application.scim_app.client_id
   provider   = azuread.admin
@@ -62,8 +63,8 @@ resource "azuread_synchronization_job" "scim_job" {
 }
 
 # 4) Segredos do job de provisionamento (SCIM BaseAddress + SecretToken)
-# - BaseAddress: var.account_scim_url (Account SCIM URL)
-# - SecretToken: data.azurerm_key_vault_secret.scim_token.value (SCIM token no KV)
+# - BaseAddress: vem de var.account_scim_url (outra opção é ler do KV em providers.tf)
+# - SecretToken: lido do KV via data.azurerm_key_vault_secret.scim_token (definido em providers.tf)
 resource "azuread_synchronization_secret" "scim_creds" {
   service_principal_id = data.azuread_service_principal.scim_sp.id
 
@@ -84,13 +85,20 @@ resource "azuread_synchronization_secret" "scim_creds" {
   depends_on = [azuread_synchronization_job.scim_job]
 }
 
+# Buffer extra para replicarem as appRoles do conector antes do assignment
+resource "time_sleep" "before_assignments" {
+  depends_on      = [azuread_synchronization_secret.scim_creds]
+  create_duration = "45s"
+}
+
 # 5) Escopo: atribuir grupos ao Enterprise App (role “User”)
-# Fallback seguro caso o nome varie ou ainda não tenha propagado
+# App role "User" com fallback seguro caso o nome varie ou ainda não tenha propagado
 locals {
-  user_role_id = length(values(data.azuread_service_principal.scim_sp.app_role_ids)) > 0 ? coalesce(
-    lookup(data.azuread_service_principal.scim_sp.app_role_ids, "User", null),
-    try(element(values(data.azuread_service_principal.scim_sp.app_role_ids), 0), null)
-  ) : "00000000-0000-0000-0000-000000000000"
+  app_roles_list     = try(data.azuread_service_principal.scim_sp.app_roles, [])
+  user_role_by_name  = try(element([for r in local.app_roles_list : r.id if lower(r.display_name) == "user"], 0), null)
+  user_role_by_value = try(element([for r in local.app_roles_list : r.id if lower(r.value) == "user"], 0), null)
+  first_enabled_role = try(element([for r in local.app_roles_list : r.id if r.enabled], 0), null)
+  user_role_id       = coalesce(local.user_role_by_name, local.user_role_by_value, local.first_enabled_role, "00000000-0000-0000-0000-000000000000")
 }
 
 resource "azuread_app_role_assignment" "assign_groups" {
@@ -100,5 +108,5 @@ resource "azuread_app_role_assignment" "assign_groups" {
   app_role_id         = local.user_role_id
   provider            = azuread.admin
 
-  depends_on = [azuread_synchronization_secret.scim_creds]
+  depends_on = [time_sleep.before_assignments]
 }
