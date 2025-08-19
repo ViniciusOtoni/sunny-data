@@ -147,19 +147,15 @@ data "databricks_group" "account_groups" {
   depends_on   = [time_sleep.after_scim_assignments]
 }
 
-# Garantir a SPN dinâmica como Service Principal no Account (cria se não existir)
-resource "databricks_service_principal" "dynamic" {
+data "databricks_service_principal" "dynamic" {
   provider       = databricks.account
   application_id = var.dbx_spn_client_id
-  display_name   = "datamaster-spn"
 }
 
-# Adicionar a SPN dinâmica como membro de cada grupo do Account
+# usa o ID resolvido para a membership
 resource "databricks_group_member" "dynamic_spn_in_account_groups" {
   for_each  = data.databricks_group.account_groups
   provider  = databricks.account
   group_id  = each.value.id
-  member_id = databricks_service_principal.dynamic.id
-
-  depends_on = [databricks_service_principal.dynamic]
+  member_id = data.databricks_service_principal.dynamic.id
 }
