@@ -20,7 +20,7 @@ resource "azuread_application" "scim_app" {
   display_name = "dbx-account-scim"
   template_id  = data.azuread_application_template.dbx_scim.template_id
   feature_tags { 
-                  enterprise = true, 
+                  enterprise = true 
                   gallery = true 
                 }
   providers = { azuread = azuread.admin }
