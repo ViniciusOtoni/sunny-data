@@ -98,54 +98,7 @@ jobs:
           echo "atribua a SPN dinâmica como account_admin"
           echo "e clique em 'Approve & deploy' para continuar."
 
-
-  # 4. AAD Sync (AIM) — cria grupos no Entra e adiciona a SPN dinâmica neles
-  aad-sync:
-    needs: await-account-admin-grant
-    runs-on: ubuntu-latest
-    env:
-      TF_VAR_subscription_id:     ${{ secrets.ARM_SUBSCRIPTION_ID }}
-      TF_VAR_tenant_id:           ${{ secrets.ARM_TENANT_ID }}
-      TF_VAR_admin_client_id:     ${{ secrets.ARM_CLIENT_ID }}
-      TF_VAR_admin_client_secret: ${{ secrets.ARM_CLIENT_SECRET }}
-    steps:
-
-      - uses: actions/checkout@v4
-
-      - name: Azure login (bootstrap)
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Export ARM_* from dynamic SPN (for azurerm backend)
-        run: |
-          set -euo pipefail
-          KV="akv-medalforge-rbac-core"
-          SPN_ID=$(az keyvault secret show --vault-name "$KV" --name spn-client-id --query value -o tsv)
-          SPN_SECRET=$(az keyvault secret show --vault-name "$KV" --name spn-client-secret --query value -o tsv)
-          echo "::add-mask::$SPN_SECRET"
-          echo "ARM_CLIENT_ID=$SPN_ID"                        >> $GITHUB_ENV
-          echo "ARM_CLIENT_SECRET=$SPN_SECRET"                >> $GITHUB_ENV
-          echo "ARM_TENANT_ID=${{ secrets.ARM_TENANT_ID }}"   >> $GITHUB_ENV
-          echo "ARM_SUBSCRIPTION_ID=${{ secrets.ARM_SUBSCRIPTION_ID }}" >> $GITHUB_ENV
-
-      - name: Fetch dynamic SPN client_id from Key Vault
-        run: |
-          KV="akv-medalforge-rbac-core"
-          SPN_ID=$(az keyvault secret show --vault-name "$KV" --name spn-client-id --query value -o tsv)
-          echo "TF_VAR_dbx_spn_client_id=$SPN_ID" >> $GITHUB_ENV
-
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.6.6
-
-      - name: Terraform init (aad-sync)
-        run: terraform -chdir=aad-sync init
-
-      - name: Terraform apply (aad-sync)
-        run: terraform -chdir=aad-sync apply -auto-approve
-
-# 5. Configuração do Unity Catalog
+# 4. Configuração do Unity Catalog
 
   workspace-config:
     name: workspace-config

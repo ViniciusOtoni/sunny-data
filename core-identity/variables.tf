@@ -49,3 +49,15 @@ variable "key_vault_name" {
   type        = string
   default     = "akv-medalforge-rbac-core"
 }
+
+
+# Grupos do Entra ID:
+
+variable "aad_group_names" {
+  type    = list(string)
+  default = [
+    "data-platform-engineers",
+    "data-consumers",
+    "data-analysts",
+  ]
+}

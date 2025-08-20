@@ -1,11 +1,3 @@
-locals {
-  aad_group_names = [
-    "data-platform-engineers",
-    "data-consumers",
-    "data-analysts",
-  ]
-}
-
 # Definição dos Resource Groups  
 
 #RG ecossistema CORE
@@ -32,13 +24,36 @@ module "service_principal" {
   providers = { azuread = azuread.admin }
 }
 
+# Buffer para propagação da SPN no Entra ID
+
+resource "time_sleep" "after_spn" {
+  create_duration = "20s"
+  depends_on      = [module.service_principal]
+}
+
+# Cria/assegura os grupos no Entra ID (com a SPN admin)
+locals {
+  aad_groups = toset(var.aad_group_names)
+}
+
 # Criação de grupos no Entra id
 
 resource "azuread_group" "aad_groups" {
-  for_each         = toset(local.aad_group_names)
+  for_each         = local.aad_groups
   display_name     = each.key
   security_enabled = true
   provider         = azuread.admin
+  depends_on       = [time_sleep.after_spn]
+}
+
+# Adiciona a SPN DINÂMICA como membro de TODOS os grupos
+resource "azuread_group_member" "dynamic_spn_in_groups" {
+  for_each         = azuread_group.aad_groups
+  group_object_id  = each.value.object_id
+  member_object_id = module.service_principal.spn_object_id
+  provider         = azuread.admin
+
+  depends_on = [azuread_group.aad_groups]
 }
 
 # Key Vault + secrets  
