@@ -1,24 +1,14 @@
-output "scim_enterprise_app_object_id" {
-  description = "Object ID do Enterprise Application (Service Principal) no Entra ID"
-  value       = data.azuread_service_principal.scim_sp.object_id
-}
-
-output "scim_enterprise_app_id" {
-  description = "ID do recurso do Enterprise Application (igual ao object_id)"
-  value       = data.azuread_service_principal.scim_sp.id
-}
-
-output "scim_application_object_id" {
-  description = "Object ID do Application Registration (app) que suporta o Enterprise App"
-  value       = azuread_application.scim_app.id
-}
-
-output "scim_application_client_id" {
-  description = "Client ID (appId) do Application Registration"
-  value       = azuread_application.scim_app.client_id
-}
-
-output "synced_group_names" {
-  description = "Grupos AAD direcionados para o SCIM"
+output "managed_group_names" {
+  description = "Grupos AAD geridos por este microserviço"
   value       = [for g in azuread_group.aad_groups : g.display_name]
+}
+
+output "managed_group_object_ids" {
+  description = "Object IDs dos grupos AAD geridos"
+  value       = { for k, g in azuread_group.aad_groups : k => g.object_id }
+}
+
+output "dynamic_spn_object_id" {
+  description = "Object ID da SPN dinâmica no Entra"
+  value       = data.azuread_service_principal.dynamic_spn.object_id
 }

@@ -34,35 +34,20 @@ resource "time_sleep" "after_assignment" {
   create_duration = "90s"
 }
 
-# --- Grupos (ACCOUNT / SCIM na conta) ---
+# --- Grupos (ACCOUNT / externos via AIM) ---
 data "databricks_group" "platform_engineers" {
   provider     = databricks.account
   display_name = "data-platform-engineers"
+  depends_on   = [time_sleep.after_assignment]
 }
+
 
 data "databricks_group" "consumers" {
   provider     = databricks.account
   display_name = "data-consumers"
+  depends_on   = [time_sleep.after_assignment]
 }
 
-# SPN já existe no workspace; resolvemos a identidade (para grants/membership)
-data "databricks_service_principal" "automation" {
-  provider       = databricks.spn
-  application_id = var.spn_client_id
-}
-
-# Coloca a SPN no grupo de engenheiros (na CONTA)
-resource "databricks_group_member" "spn_platform_engineers_account" {
-  provider  = databricks.account
-  group_id  = databricks_group.platform_engineers.id
-  member_id = data.databricks_service_principal.automation.id
-}
-
-# Pequeno buffer de SCIM
-resource "time_sleep" "after_groups" {
-  depends_on      = [databricks_group.platform_engineers, databricks_group.consumers, databricks_group_member.spn_platform_engineers_account]
-  create_duration = "10s"
-}
 
 # --- Grants no Metastore (WORKSPACE/SPN) ---
 resource "databricks_grants" "metastore" {
@@ -71,11 +56,11 @@ resource "databricks_grants" "metastore" {
 
   # Quem poderá criar catálogos:
   grant {
-    principal  = databricks_group.platform_engineers.display_name
+    principal  = "data-platform-engineers"
     privileges = ["CREATE_CATALOG"]
   }
 
-  depends_on = [time_sleep.after_assignment, time_sleep.after_groups]
+  depends_on = [time_sleep.after_assignment]
 }
 
 # --- Storage Credential (WORKSPACE / SPN) ---
@@ -153,18 +138,35 @@ resource "databricks_catalog" "monitoring" {
   depends_on     = [databricks_grants.metastore]
 }
 
+# --- Atribuindo os grupos à workspace ---
+
+resource "databricks_permission_assignment" "ws_user_platform_engineers" {
+  provider     = databricks.account
+  workspace_id = local.workspace_id_numeric
+  principal_id = data.databricks_group.platform_engineers.id
+  permissions  = ["USER"]   
+  depends_on   = [data.databricks_group.platform_engineers]
+}
+
+resource "databricks_permission_assignment" "ws_user_consumers" {
+  provider     = databricks.account
+  workspace_id = local.workspace_id_numeric
+  principal_id = data.databricks_group.consumers.id
+  permissions  = ["USER"]
+  depends_on   = [data.databricks_group.consumers]
+}
+
 # --- Grants dos catálogos (WORKSPACE/SPN) ---
 resource "databricks_grants" "bronze_grants" {
   provider   = databricks.spn
   catalog    = databricks_catalog.bronze.name
-  depends_on = [databricks_group.platform_engineers, databricks_group.consumers]
 
   grant {
-    principal  = databricks_group.platform_engineers.display_name
+    principal  = "data-platform-engineers"
     privileges = local.engineer_catalog_privs
   }
   grant {
-    principal  = databricks_group.consumers.display_name
+    principal  = "data-consumers"
     privileges = local.consumer_bronze_privs
   }
 }
@@ -172,14 +174,14 @@ resource "databricks_grants" "bronze_grants" {
 resource "databricks_grants" "silver_grants" {
   provider   = databricks.spn
   catalog    = databricks_catalog.silver.name
-  depends_on = [databricks_group.platform_engineers, databricks_group.consumers]
+
 
   grant {
-    principal  = databricks_group.platform_engineers.display_name
+    principal  = "data-platform-engineers"
     privileges = local.engineer_catalog_privs
   }
   grant {
-    principal  = databricks_group.consumers.display_name
+    principal  = "data-consumers"
     privileges = local.consumer_silver_privs
   }
 }
@@ -187,14 +189,14 @@ resource "databricks_grants" "silver_grants" {
 resource "databricks_grants" "monitoring_grants" {
   provider   = databricks.spn
   catalog    = databricks_catalog.monitoring.name
-  depends_on = [databricks_group.platform_engineers, databricks_group.consumers]
+
 
   grant {
-    principal  = databricks_group.platform_engineers.display_name
+    principal  = "data-platform-engineers"
     privileges = local.engineer_monitoring_privs
   }
   grant {
-    principal  = databricks_group.consumers.display_name
+    principal  = "data-consumers"
     privileges = local.consumer_silver_privs
   }
 }
