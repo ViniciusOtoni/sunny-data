@@ -117,11 +117,16 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Export ARM_* for azurerm backend
+      - name: Export ARM_* from dynamic SPN (for azurerm backend)
         run: |
-          echo "ARM_CLIENT_ID=${{ secrets.ARM_CLIENT_ID }}" >> $GITHUB_ENV
-          echo "ARM_CLIENT_SECRET=${{ secrets.ARM_CLIENT_SECRET }}" >> $GITHUB_ENV
-          echo "ARM_TENANT_ID=${{ secrets.ARM_TENANT_ID }}" >> $GITHUB_ENV
+          set -euo pipefail
+          KV="akv-medalforge-rbac-core"
+          SPN_ID=$(az keyvault secret show --vault-name "$KV" --name spn-client-id --query value -o tsv)
+          SPN_SECRET=$(az keyvault secret show --vault-name "$KV" --name spn-client-secret --query value -o tsv)
+          echo "::add-mask::$SPN_SECRET"
+          echo "ARM_CLIENT_ID=$SPN_ID"                        >> $GITHUB_ENV
+          echo "ARM_CLIENT_SECRET=$SPN_SECRET"                >> $GITHUB_ENV
+          echo "ARM_TENANT_ID=${{ secrets.ARM_TENANT_ID }}"   >> $GITHUB_ENV
           echo "ARM_SUBSCRIPTION_ID=${{ secrets.ARM_SUBSCRIPTION_ID }}" >> $GITHUB_ENV
 
       - name: Fetch dynamic SPN client_id from Key Vault
