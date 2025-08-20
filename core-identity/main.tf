@@ -1,3 +1,10 @@
+locals {
+  aad_group_names = [
+    "data-platform-engineers",
+    "data-consumers",
+    "data-analysts",
+  ]
+}
 
 # Definição dos Resource Groups  
 
@@ -25,6 +32,14 @@ module "service_principal" {
   providers = { azuread = azuread.admin }
 }
 
+# Criação de grupos no Entra id
+
+resource "azuread_group" "aad_groups" {
+  for_each         = toset(local.aad_group_names)
+  display_name     = each.key
+  security_enabled = true
+  provider         = azuread.admin
+}
 
 # Key Vault + secrets  
 
