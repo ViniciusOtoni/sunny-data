@@ -36,14 +36,14 @@ resource "time_sleep" "after_assignment" {
 
 # --- Grupos (ACCOUNT / externos via AIM) ---
 data "databricks_group" "platform_engineers" {
-  provider     = databricks.account
+  provider     = databricks.spn
   display_name = "data-platform-engineers"
   depends_on   = [time_sleep.after_assignment]
 }
 
 
 data "databricks_group" "consumers" {
-  provider     = databricks.account
+  provider     = databricks.spn
   display_name = "data-consumers"
   depends_on   = [time_sleep.after_assignment]
 }
@@ -141,16 +141,14 @@ resource "databricks_catalog" "monitoring" {
 # --- Atribuindo os grupos à workspace ---
 
 resource "databricks_permission_assignment" "ws_user_platform_engineers" {
-  provider     = databricks.account
-  workspace_id = local.workspace_id_numeric
+  provider     = databricks.spn
   principal_id = data.databricks_group.platform_engineers.id
   permissions  = ["USER"]   
   depends_on   = [data.databricks_group.platform_engineers]
 }
 
 resource "databricks_permission_assignment" "ws_user_consumers" {
-  provider     = databricks.account
-  workspace_id = local.workspace_id_numeric
+  provider     = databricks.spn
   principal_id = data.databricks_group.consumers.id
   permissions  = ["USER"]
   depends_on   = [data.databricks_group.consumers]
