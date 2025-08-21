@@ -11,7 +11,7 @@ permissions:
   actions: write
 
 jobs:
-  landing:
+  landing-zone:
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     env:
@@ -25,6 +25,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # baixa o tfstate do core 
+      - name: Download core-identity tfstate 
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: core-identity
+          run_id:  ${{ github.event.workflow_run.id }}
+          name: tfstate-core
+          path: core-identity
+        continue-on-error: true
+
       - name: Azure login
         uses: azure/login@v2
         with:
@@ -34,33 +44,32 @@ jobs:
         with:
           terraform_version: 1.6.6
 
-      # Traz o tfstate do core (1ª execução vem desse artefato)
-      - name: Download core-identity tfstate artifact
-        uses: dawidd6/action-download-artifact@v3
-        with:
-          workflow: core-identity
-          run_id:  ${{ github.event.workflow_run.id }}
-          name: tfstate-core
-          path: core-identity
-        continue-on-error: true
+      # 1) Bootstrapping – força backend LOCAL no landing-zone
+      - name: Switch backend to local (landing-zone)
+        run: |
+          if [ -f landing-zone/backend.tf ]; then mv landing-zone/backend.tf landing-zone/backend_remote.bak; fi
+          printf 'terraform {\n  backend "local" {}\n}\n' > landing-zone/backend.tf
 
-      # 1) Ignora o backend azurerm para levantar o SA (usa state local temporário)
-      - name: Terraform init (landing-zone, backend=false)
-        run: terraform -chdir=landing-zone init -backend=false
+      - name: Terraform init (local)
+        run: terraform -chdir=landing-zone init
 
       - name: Terraform apply (create SA + container + roles)
         run: terraform -chdir=landing-zone apply -auto-approve
 
-      # 2) Captura uma account key para o init do backend azurerm
-      - name: Capture SA access key
+      # pega a access key do SA p/ reconfigurar backend azurerm
+      - name: Capture Storage Account key
         id: sa
         run: |
           KEY=$(az storage account keys list -n "$SA_NAME" -g "$RG_NAME" --query "[0].value" -o tsv)
           echo "::add-mask::$KEY"
           echo "ACKEY=$KEY" >> $GITHUB_ENV
 
-      # 3) Migra o state do landing-zone (local -> azurerm)
-      - name: Migrate landing-zone state to azurerm backend
+      # 2) Migra o state do landing-zone (local -> azurerm)
+      - name: Restore azurerm backend file (landing-zone)
+        run: |
+          if [ -f landing-zone/backend_remote.bak ]; then mv landing-zone/backend_remote.bak landing-zone/backend.tf; fi
+
+      - name: Migrate landing-zone state to azurerm
         env:
           ARM_ACCESS_KEY: ${{ env.ACKEY }}
         run: |
@@ -71,14 +80,14 @@ jobs:
             -backend-config="key=landing.tfstate" \
             -migrate-state -force-copy
 
-      # 4) Migra o state do core-identity (se vier como artefato)
-      - name: Migrate core-identity state to azurerm backend
+      # 3) Migra o tfstate do core-identity (se veio como artefato)
+      - name: Migrate core-identity state to azurerm
         if: hashFiles('core-identity/terraform.tfstate') != ''
         env:
           ARM_ACCESS_KEY: ${{ env.ACKEY }}
         run: |
           cd core-identity
-          # Substitui backend local por azurerm para esta pasta
+          # troca backend local -> azurerm para esta pasta
           if [ -f backend.tf ]; then mv backend.tf backend_local.bak; fi
           printf 'terraform {\n  backend "azurerm" {}\n}\n' > backend.tf
           terraform init -reconfigure \
@@ -88,13 +97,4 @@ jobs:
             -backend-config="key=core.tfstate" \
             -migrate-state -force-copy
 
-      # 5) (Opcional) Deixa uma cópia local atualizada do core.tfstate,
-      #    caso ainda haja data.terraform_remote_state local em algum módulo
-      - name: Refresh local copy of core tfstate
-        run: |
-          az storage blob download \
-            --account-name "$SA_NAME" \
-            --container-name "tfstate" \
-            --name "core.tfstate" \
-            --file "core-identity/terraform.tfstate" \
-            --auth-mode login || true
+
