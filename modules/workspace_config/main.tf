@@ -34,33 +34,37 @@ resource "time_sleep" "after_assignment" {
   create_duration = "90s"
 }
 
-# --- Grupos (ACCOUNT / externos via AIM) ---
-data "databricks_group" "platform_engineers" {
+# --- Propagação dos grupos (ACCOUNT) ---
+# Recebe um mapa: { "data-platform-engineers" = "<AAD objectId>", ... }
+resource "databricks_group" "account_groups" {
+  for_each     = var.groups_objects_ids
   provider     = databricks.account
-  display_name = "data-platform-engineers"
+  display_name = each.key          # "data-platform-engineers", "data-consumers", etc.
+  external_id  = each.value        # objectId do AAD (âncora IAM)
   depends_on   = [time_sleep.after_assignment]
 }
 
-
-data "databricks_group" "consumers" {
+# Atribuir esses grupos à workspace como USER (Account-level)
+resource "databricks_mws_permission_assignment" "ws_users" {
+  for_each     = databricks_group.account_groups
   provider     = databricks.account
-  display_name = "data-consumers"
-  depends_on   = [time_sleep.after_assignment]
+  workspace_id = local.workspace_id_numeric
+  principal_id = each.value.id
+  permissions  = ["USER"]
 }
-
 
 # --- Grants no Metastore (WORKSPACE/SPN) ---
 resource "databricks_grants" "metastore" {
   provider  = databricks.spn
   metastore = databricks_metastore.uc.id
 
-  # Quem poderá criar catálogos:
   grant {
     principal  = "data-platform-engineers"
     privileges = ["CREATE_CATALOG"]
   }
 
-  depends_on = [time_sleep.after_assignment]
+  # garante que os grupos já estão na workspace
+  depends_on = [time_sleep.after_assignment, databricks_mws_permission_assignment.ws_users]
 }
 
 # --- Storage Credential (WORKSPACE / SPN) ---
@@ -138,24 +142,6 @@ resource "databricks_catalog" "monitoring" {
   depends_on     = [databricks_grants.metastore]
 }
 
-# --- Atribuindo os grupos à workspace ---
-
-resource "databricks_permission_assignment" "ws_user_platform_engineers" {
-  provider     = databricks.account
-  workspace_id = local.workspace_id_numeric  
-  principal_id = data.databricks_group.platform_engineers.id
-  permissions  = ["USER"]   
-  depends_on   = [data.databricks_group.platform_engineers]
-}
-
-resource "databricks_permission_assignment" "ws_user_consumers" {
-  provider     = databricks.account
-  workspace_id = local.workspace_id_numeric  
-  principal_id = data.databricks_group.consumers.id
-  permissions  = ["USER"]
-  depends_on   = [data.databricks_group.consumers]
-}
-
 # --- Grants dos catálogos (WORKSPACE/SPN) ---
 resource "databricks_grants" "bronze_grants" {
   provider   = databricks.spn
@@ -169,12 +155,13 @@ resource "databricks_grants" "bronze_grants" {
     principal  = "data-consumers"
     privileges = local.consumer_bronze_privs
   }
+
+  depends_on = [databricks_mws_permission_assignment.ws_users]
 }
 
 resource "databricks_grants" "silver_grants" {
   provider   = databricks.spn
   catalog    = databricks_catalog.silver.name
-
 
   grant {
     principal  = "data-platform-engineers"
@@ -184,12 +171,13 @@ resource "databricks_grants" "silver_grants" {
     principal  = "data-consumers"
     privileges = local.consumer_silver_privs
   }
+
+  depends_on = [databricks_mws_permission_assignment.ws_users]
 }
 
 resource "databricks_grants" "monitoring_grants" {
   provider   = databricks.spn
   catalog    = databricks_catalog.monitoring.name
-
 
   grant {
     principal  = "data-platform-engineers"
@@ -199,4 +187,6 @@ resource "databricks_grants" "monitoring_grants" {
     principal  = "data-consumers"
     privileges = local.consumer_silver_privs
   }
+
+  depends_on = [databricks_mws_permission_assignment.ws_users]
 }

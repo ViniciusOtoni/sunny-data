@@ -3,7 +3,7 @@ terraform {
     # Padroniza para o provider oficial da Databricks
     databricks = {
       source  = "databricks/databricks"
-      version = "~> 1.22"   
+      version = "~> 1.40"   
     }
   }
 }
@@ -49,3 +49,15 @@ data "terraform_remote_state" "dbx" {
     use_azuread_auth     = true  
   }
 }
+
+data "terraform_remote_state" "core" {
+  backend = "azurerm"
+  config = {
+    storage_account_name = "stmedalforgestate"
+    container_name       = "tfstate"
+    key                  = "core.tfstate"      
+    resource_group_name  = "rg-medalforge-core"
+    use_azuread_auth     = true
+  }
+}
+

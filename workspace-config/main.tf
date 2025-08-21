@@ -10,6 +10,8 @@ module "workspace_config" {
   databricks_region         = var.location
   azure_managed_identity_id = data.terraform_remote_state.storage.outputs.access_connector_id
 
+  groups_objects_ids = data.terraform_remote_state.core.outputs.aad_group_object_ids
+
   raw_url    = "abfss://raw@${data.terraform_remote_state.storage.outputs.storage_lake_name}.dfs.core.windows.net/"
   bronze_url = "abfss://bronze@${data.terraform_remote_state.storage.outputs.storage_lake_name}.dfs.core.windows.net/"
   silver_url = "abfss://silver@${data.terraform_remote_state.storage.outputs.storage_lake_name}.dfs.core.windows.net/"

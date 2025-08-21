@@ -3,88 +3,98 @@ on:
   workflow_run:
     workflows: ["core-identity"]
     types: [completed]
+  workflow_dispatch: {}
 
+permissions:
+  contents: read
+  id-token: write
+  actions: write
 
 jobs:
-  landing-zone:
+  landing:
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     env:
-      TF_VAR_subscription_id:  ${{ secrets.ARM_SUBSCRIPTION_ID }}
-      TF_VAR_tenant_id:        ${{ secrets.ARM_TENANT_ID }}
-      TF_VAR_admin_client_id:  ${{ secrets.ARM_CLIENT_ID }}
+      TF_VAR_subscription_id:     ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id:           ${{ secrets.ARM_TENANT_ID }}
+      TF_VAR_admin_client_id:     ${{ secrets.ARM_CLIENT_ID }}
       TF_VAR_admin_client_secret: ${{ secrets.ARM_CLIENT_SECRET }}
+      SA_NAME: stmedalforgestate
+      RG_NAME: rg-medalforge-core
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    # artefato do core-identity
-    - name: Download core-identity tfstate
-      uses: dawidd6/action-download-artifact@v3
-      with:
-        workflow: core-identity
-        run_id:  ${{ github.event.workflow_run.id }}
-        name: tfstate-core
-        path: core-identity
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-    - name: Azure login
-      uses: azure/login@v2
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
 
-    - uses: hashicorp/setup-terraform@v3
-      with:
-        terraform_version: 1.6.6
+      # Traz o tfstate do core (1ª execução vem desse artefato)
+      - name: Download core-identity tfstate artifact
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          workflow: core-identity
+          run_id:  ${{ github.event.workflow_run.id }}
+          name: tfstate-core
+          path: core-identity
+        continue-on-error: true
 
-    
-    # 1) Bootstrapping – backend LOCAL
+      # 1) Ignora o backend azurerm para levantar o SA (usa state local temporário)
+      - name: Terraform init (landing-zone, backend=false)
+        run: terraform -chdir=landing-zone init -backend=false
 
-    # Esconde o backend azurerm original
-    - name: Switch backend to local temporarily
-      run: |
-        mv landing-zone/backend.tf landing-zone/backend_remote.bak
-        cat <<EOF > landing-zone/backend.tf
-        terraform {
-          backend "local" {}
-        }
-        EOF
+      - name: Terraform apply (create SA + container + roles)
+        run: terraform -chdir=landing-zone apply -auto-approve
 
-    - name: Terraform init (local)
-      run: terraform -chdir=landing-zone init
+      # 2) Captura uma account key para o init do backend azurerm
+      - name: Capture SA access key
+        id: sa
+        run: |
+          KEY=$(az storage account keys list -n "$SA_NAME" -g "$RG_NAME" --query "[0].value" -o tsv)
+          echo "::add-mask::$KEY"
+          echo "ACKEY=$KEY" >> $GITHUB_ENV
 
-    - name: Terraform apply (create SA)
-      run: terraform -chdir=landing-zone apply -auto-approve
+      # 3) Migra o state do landing-zone (local -> azurerm)
+      - name: Migrate landing-zone state to azurerm backend
+        env:
+          ARM_ACCESS_KEY: ${{ env.ACKEY }}
+        run: |
+          terraform -chdir=landing-zone init -reconfigure \
+            -backend-config="resource_group_name=${{ env.RG_NAME }}" \
+            -backend-config="storage_account_name=${{ env.SA_NAME }}" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=landing.tfstate" \
+            -migrate-state -force-copy
 
-    # captura SA e RG
-    - name: Capture outputs
-      id: tfout
-      run: |
-        SA=$(terraform -chdir=landing-zone output -raw state_sa_name)
-        RG=$(terraform -chdir=landing-zone output -raw state_rg_name)
-        # pega a chave primária do Storage Account
-        ACCESS_KEY=$(az storage account keys list \
-                      --account-name "$SA" \
-                      --resource-group "$RG" \
-                      --query "[0].value" -o tsv)
-        echo "::add-mask::$ACCESS_KEY"
-        echo "sa=$SA"       >> $GITHUB_OUTPUT
-        echo "rg=$RG"       >> $GITHUB_OUTPUT
-        echo "ackey=$ACCESS_KEY" >> $GITHUB_OUTPUT
+      # 4) Migra o state do core-identity (se vier como artefato)
+      - name: Migrate core-identity state to azurerm backend
+        if: hashFiles('core-identity/terraform.tfstate') != ''
+        env:
+          ARM_ACCESS_KEY: ${{ env.ACKEY }}
+        run: |
+          cd core-identity
+          # Substitui backend local por azurerm para esta pasta
+          if [ -f backend.tf ]; then mv backend.tf backend_local.bak; fi
+          printf 'terraform {\n  backend "azurerm" {}\n}\n' > backend.tf
+          terraform init -reconfigure \
+            -backend-config="resource_group_name=${{ env.RG_NAME }}" \
+            -backend-config="storage_account_name=${{ env.SA_NAME }}" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=core.tfstate" \
+            -migrate-state -force-copy
 
-
-    # 2) Migração – backend AZURERM
-
-    # Restaura o backend remoto
-    - name: Restore azurerm backend file
-      run: |
-        mv landing-zone/backend_remote.bak landing-zone/backend.tf
-
-    - name: Migrate landing-zone state
-      env:
-        ARM_ACCESS_KEY: ${{ steps.tfout.outputs.ackey }}
-      run: |
-        terraform -chdir=landing-zone init \
-          -backend-config="storage_account_name=${{ steps.tfout.outputs.sa }}" \
-          -backend-config="container_name=tfstate" \
-          -backend-config="key=landing.tfstate" \
-          -migrate-state -force-copy
+      # 5) (Opcional) Deixa uma cópia local atualizada do core.tfstate,
+      #    caso ainda haja data.terraform_remote_state local em algum módulo
+      - name: Refresh local copy of core tfstate
+        run: |
+          az storage blob download \
+            --account-name "$SA_NAME" \
+            --container-name "tfstate" \
+            --name "core.tfstate" \
+            --file "core-identity/terraform.tfstate" \
+            --auth-mode login || true

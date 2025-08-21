@@ -39,6 +39,12 @@ variable "azure_managed_identity_id" {
   type        = string
 }
 
+variable "groups_objects_ids" {
+  description = "Mapa nome->objectId de grupos AAD (do core-identity)"
+  type        = map(string)
+}
+
+
 variable "raw_url" {
   description = "URL ABFSS para a camada Raw"
   type        = string
