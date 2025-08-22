@@ -57,7 +57,6 @@ variable "aad_group_names" {
   type    = list(string)
   default = [
     "data-platform-engineers",
-    "data-consumers",
-    "data-analysts",
+    "data-consumers"
   ]
 }
