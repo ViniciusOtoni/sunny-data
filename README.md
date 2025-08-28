@@ -8,10 +8,45 @@
 
 O repositório "sunny-data" é um dos componentes da solução [One Data](https://github.com/ViniciusOtoni/medalforge-lakehouse-data) para o programa Data Master organizado pela F1rst Santander. Solução proposta e desenvolvida por [Vinicius Otoni](http://linkedin.com/in/vinicius-otoni-b330b3295/)
 
-Conteúdos do repositório:
+## Conteúdos do Repositório
 
-1. [Visão Inicial](#1-visão-inicial)
-    - [Objetivo]()
+1. [Visão Inicial](#1-visão-inicial)  
+   - [Objetivo](#11-objetivo)  
+   - [Visão do fluxo](#12-visão-do-fluxo)  
+   - [Componentes](#13-componentes)  
+
+2. [Arquitetura Técnica](#2-arquitetura-técnica)  
+
+3. [Terraform](#3-terraform)  
+   - [Arquitetura de Módulos](#31-arquitetura-de-módulos)  
+   - [Vídeo Técnico](#32-vídeo-técnico-demostração-no-projeto)  
+
+4. [Least Privilege](#4-least-privelege)  
+
+5. [Microserviços](#5-microserviços)  
+   - [core-identity](#51-core-identity)  
+   - [landing-zone](#52-landing-zone)  
+   - [storage-foundation](#53-storage-foundation)  
+   - [databricks-workspace](#54-databricks-workspace)  
+   - [workspace-config](#55-workspace-config)  
+
+6. [GitHub Actions](#6-github-actions)  
+   - [Vídeo Técnico](#61-vídeo-técnico-demostração-no-projeto)  
+
+7. [Sync Databricks (IAM)](#7-sync-databricks-iam)  
+   - [Funcionamento](#71-funcionamento)  
+   - [Materialização de grupos e usuários](#72-materialização-de-grupos-e-usuários)  
+   - [Integração com Terraform](#73-integração-com-terraform)  
+   - [Grants e permissões](#74-grants-e-permissões)  
+
+8. [Pré-requisitos (Setup)](#8-pré-requisitos-setup)  
+   - [Criação da SPN Bootstrap](#81-criaçao-da-spn-bootstrap)  
+   - [Atribuição da SPN dinâmica como Account Admin](#82-atribuição-da-spn-dinâmica-como-account-admin)  
+
+9. [Melhorias Futuras](#9-melhorias-futuras)  
+
+10. [Referências](#10-referências)
+
 ---
 
 ## 1. Visão Inicial
@@ -87,7 +122,7 @@ O processo será dividido em dois contextos:
     Gerênciado principalmente pela SPN bootstrap, seguindo os princípios de [Least Priveleage](#4-least-privelege). Responsável por criar a SPN dinâmica, armazenar as suas respectivas secrets no Key Vault além de criar um Storage Account para repousar os *tfstate* gerados pelo Terraform durante o processo de CI/CD.
 
  - **RG-DATALAKE**
-    Gerênciado pela SPN dinâmica, responsável por gerar todo o ecossistema do datalake. Provisionando o Storage Account aonde os dados serão armazenados em suas respectivas etapas/estados, além de criar o Databricks para execução do processo de ciclo de vida com o dado... Além da conectividade entre Databricks e o Storage.
+    Gerenciado pela SPN dinâmica, é responsável por provisionar todo o ecossistema do Data Lake. Isso inclui a criação do Storage Account, onde os dados são armazenados em suas diferentes camadas/estágios, e a criação do Databricks, que executa o ciclo de vida do dado. Além disso, garante a conectividade segura entre o Databricks e o Storage, assegurando governança e automação do fluxo de dados.
 
 <p align="left">
   <img src="./assets/images/arquitetura-infra.png" alt="Ideação Projeto" width="100%" style="border-radius: 1%;"/>
