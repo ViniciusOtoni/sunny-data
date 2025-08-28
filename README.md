@@ -59,7 +59,7 @@ Sunny-data é um componente responsável pela criação de todo o ecossistema do
 
 ### 1.2 Visão do fluxo
 
-O projeto foi desenvolvido pensando em evitar manualidades e respeitando princípios de segurança. Sendo assim, foi utilizado o conceito de [Least Priveleage](#4-least-privelege) para evitar vulnerabilidades relacionadas a acessos na Azure, além de evitar manualidade com o Terraform e GitHub Actions.
+O projeto foi desenvolvido pensando em evitar manualidades e respeitando princípios de segurança. Sendo assim, foi utilizado o conceito de [Least Privelege](#4-least-privelege) para evitar vulnerabilidades relacionadas a acessos na Azure, além de evitar manualidade com o Terraform e GitHub Actions.
 
 <p align="left">
   <img src="./assets/images/fluxo-ideacao.png" alt="Ideação Projeto" width="100%" style="border-radius: 1%;"/>
@@ -107,7 +107,7 @@ Componentes/recursos criados na Azure através do Terraform para execução do f
         
             A partir desse credential, o Databricks pode ler e gravar dados no Storage de forma segura, sempre aplicando as permissões e a governança definidas no Unity Catalog.
 
-- **Managed Identity (Access Conector)**
+- **Managed Identity (Access Connector)**
 É um recurso do Azure que fornece uma identidade gerenciada (Managed Identity) usada pelo Azure Databricks para autenticar-se no Storage Account, sem necessidade de segredos ou chaves de acesso (Keys do Storage Account). Essa identidade recebe as roles mínimas necessárias (como Storage Blob Data Contributor) no Storage Account, garantindo que apenas ela possa realizar as operações de leitura e escrita.
 
     No contexto do Unity Catalog, o Access Connector é associado a um Storage Credential, permitindo que o Databricks acesse os dados do Storage e aplique controles de segurança e governança em nível lógico (tabelas, esquemas, catálogos).
@@ -119,7 +119,7 @@ A arquitetura técnica é baseada em uma infraestrutura provisionada via Terrafo
 O processo será dividido em dois contextos:
 
  - **RG-CORE**
-    Gerênciado principalmente pela SPN bootstrap, seguindo os princípios de [Least Priveleage](#4-least-privelege). Responsável por criar a SPN dinâmica, armazenar as suas respectivas secrets no Key Vault além de criar um Storage Account para repousar os *tfstate* gerados pelo Terraform durante o processo de CI/CD.
+    Gerênciado principalmente pela SPN bootstrap, seguindo os princípios de [Least Privelege](#4-least-privelege). Responsável por criar a SPN dinâmica, armazenar as suas respectivas secrets no Key Vault além de criar um Storage Account para repousar os *tfstate* gerados pelo Terraform durante o processo de CI/CD.
 
  - **RG-DATALAKE**
     Gerenciado pela SPN dinâmica, é responsável por provisionar todo o ecossistema do Data Lake. Isso inclui a criação do Storage Account, onde os dados são armazenados em suas diferentes camadas/estágios, e a criação do Databricks, que executa o ciclo de vida do dado. Além disso, garante a conectividade segura entre o Databricks e o Storage, assegurando governança e automação do fluxo de dados.
@@ -193,7 +193,7 @@ Foi adotada a abordagem de microserviços para dividir os processos de provision
 Dessa forma, é possível executar de forma encadeada os microserviços via CI/CD além de garantir melhor governança para os mesmos.  
 
 ### 5.1 core-identity
-Este microserviço é responsável pela criação de todos os recursos core do ecossistema. Ele provisiona dois Resource Groups principais (rg-medalforge-core e rg-medalforge-datalake), cria a SPN dinâmica seguindo o princípio de [Least Priveleage](#4-least-privelege) e realiza a atribuição das roles necessárias nesses Resource Groups.
+Este microserviço é responsável pela criação de todos os recursos core do ecossistema. Ele provisiona dois Resource Groups principais (rg-medalforge-core e rg-medalforge-datalake), cria a SPN dinâmica seguindo o princípio de [Least Privelege](#4-least-privelege) e realiza a atribuição das roles necessárias nesses Resource Groups.
 
 Além disso, provisiona um Key Vault para armazenar, de forma segura, o *CLIENT_ID* e o *CLIENT_SECRET* da SPN dinâmica como secrets. Por fim, também cria grupos no Microsoft Entra ID, adicionando a SPN dinâmica como membro, garantindo que ela esteja incluída nas políticas de identidade e governança do ambiente.
 
@@ -209,7 +209,7 @@ O Storage Account medalforgedatabricks é configurado como Storage Root no momen
 
 Já o Storage Account medalforgestorage é destinado ao Data Lake, estruturado segundo a Medallion Architecture (raw → bronze → silver → gold), sendo o local onde os dados brutos são ingeridos e evoluem através das camadas de transformação até atingir os modelos analíticos finais.
 
-Por fim, este microserviço também provisiona o Managed Identity (Access Connector), que será utilizado pelo Databricks para autenticar-se com segurança nos Storage Accounts, eliminando a necessidade de chaves de acesso. [Definição do Access Conector](#13-componentes)
+Por fim, este microserviço também provisiona o Managed Identity (Access Connector), que será utilizado pelo Databricks para autenticar-se com segurança nos Storage Accounts, eliminando a necessidade de chaves de acesso. [Definição do Access Connector](#13-componentes)
 
 ### 5.4 databricks-workspace
 Este microserviço é responsável por provisionar a Workspace do Databricks utilizando a SPN dinâmica, garantindo que a criação seja totalmente automatizada via IaC. Durante o provisionamento, a workspace já é configurada para utilizar o Managed Identity (Access Connector), permitindo futuras integrações seguras com o Unity Catalog, como a criação de Storage Credentials e External Locations.
