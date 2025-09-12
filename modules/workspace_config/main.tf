@@ -3,7 +3,7 @@ locals {
 
   # Privilégios padronizados (nível Catálogo)
   engineer_catalog_privs    = ["BROWSE","USE_CATALOG","CREATE_SCHEMA","READ_VOLUME","WRITE_VOLUME"]
-  consumer_bronze_privs     = ["BROWSE","USE_CATALOG"]
+  consumer_bronze_privs     = ["BROWSE","USE_CATALOG", "SELECT"]
   consumer_silver_privs     = ["BROWSE","USE_CATALOG","SELECT"]
   engineer_monitoring_privs = ["BROWSE","USE_CATALOG","CREATE_SCHEMA"]
 }
