@@ -1,5 +1,6 @@
 locals {
   rg_datalake = data.terraform_remote_state.landing.outputs.rg_datalake_name
+  spn_object_id = data.terraform_remote_state.landing.outputs.spn_object_id
 }
 
 
@@ -52,5 +53,13 @@ resource "azurerm_role_assignment" "to_lake" {
   scope                = module.storage_lake.storage_account_id
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = azurerm_databricks_access_connector.uc.identity[0].principal_id
+  provider             = azurerm.admin
+}
+
+# Permissão para a SPN dinâmica 
+resource "azurerm_role_assignment" "to_lake" {
+  scope                = module.storage_lake.storage_account_id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = local.spn_object_id
   provider             = azurerm.admin
 }
