@@ -42,6 +42,9 @@ jobs:
       TF_VAR_bootstrap_spn_object_id: ${{ secrets.ARM_OBJECT_ID }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ViniciusOtoni/sunny-data
+          ref: main
 
       - name: Azure Login (bootstrap)
         uses: azure/login@v2
@@ -77,6 +80,9 @@ jobs:
       RG_NAME: rg-medalforge-core
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ViniciusOtoni/sunny-data
+          ref: main
 
       - name: Download core-identity tfstate
         uses: actions/download-artifact@v4
@@ -93,7 +99,7 @@ jobs:
         with:
           terraform_version: 1.6.6
 
-      # Backend local temporário para criar o SA de state
+      # 1) Bootstrapping – backend LOCAL no landing-zone
       - name: Switch backend to local temporarily
         run: |
           mv landing-zone/backend.tf landing-zone/backend_remote.bak
@@ -120,6 +126,7 @@ jobs:
           echo "rg=$RG"     >> $GITHUB_OUTPUT
           echo "ackey=$ACCESS_KEY" >> $GITHUB_OUTPUT
 
+      # 2) Migração – backend AZURERM do landing-zone
       - name: Restore azurerm backend file
         run: mv landing-zone/backend_remote.bak landing-zone/backend.tf
 
@@ -163,6 +170,9 @@ jobs:
       TF_VAR_tenant_id:         ${{ secrets.ARM_TENANT_ID }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ViniciusOtoni/sunny-data
+          ref: main
 
       - name: Azure Login (bootstrap)
         uses: azure/login@v2
@@ -202,6 +212,9 @@ jobs:
       TF_VAR_tenant_id:       ${{ secrets.ARM_TENANT_ID }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ViniciusOtoni/sunny-data
+          ref: main
 
       - name: Azure login (bootstrap)
         uses: azure/login@v2
@@ -242,6 +255,11 @@ jobs:
     needs: databricks_workspace
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ViniciusOtoni/sunny-data
+          ref: main
+
       - name: Azure login (bootstrap)
         uses: azure/login@v2
         with:
@@ -272,6 +290,9 @@ jobs:
       TF_VAR_databricks_account_id: ${{ secrets.ARM_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ViniciusOtoni/sunny-data
+          ref: main
 
       - name: Azure login (bootstrap)
         uses: azure/login@v2
@@ -282,53 +303,3 @@ jobs:
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.6.6
-
-      - name: Fetch dynamic-SPN creds (UC)
-        id: kv_uc
-        run: |
-          KV="akv-medalforge-rbac-core"
-          SPN_ID=$(az keyvault secret show --vault-name "$KV" --name spn-client-id     -o tsv --query value)
-          SPN_SECRET=$(az keyvault secret show --vault-name "$KV" --name spn-client-secret -o tsv --query value)
-          echo "::add-mask::$SPN_SECRET"
-          echo "TF_VAR_spn_client_id=$SPN_ID"         >> $GITHUB_ENV
-          echo "TF_VAR_spn_client_secret=$SPN_SECRET" >> $GITHUB_ENV
-          echo "ARM_CLIENT_ID=$SPN_ID"                >> $GITHUB_ENV
-          echo "ARM_CLIENT_SECRET=$SPN_SECRET"        >> $GITHUB_ENV
-          echo "ARM_SUBSCRIPTION_ID=${{ env.TF_VAR_subscription_id }}" >> $GITHUB_ENV
-          echo "ARM_TENANT_ID=${{ env.TF_VAR_tenant_id }}"             >> $GITHUB_ENV
-          echo "AZURE_CLIENT_ID=$SPN_ID"              >> $GITHUB_ENV
-          echo "AZURE_CLIENT_SECRET=$SPN_SECRET"      >> $GITHUB_ENV
-          echo "AZURE_TENANT_ID=${{ env.TF_VAR_tenant_id }}"          >> $GITHUB_ENV
-          unset AZURE_FEDERATED_TOKEN_FILE || true
-          echo "AZURE_FEDERATED_TOKEN_FILE=" >> $GITHUB_ENV
-
-      - name: Terraform init (workspace-config)
-        run: terraform -chdir=workspace-config init -upgrade -reconfigure
-
-      - name: Terraform apply (workspace-config)
-        run: terraform -chdir=workspace-config apply -auto-approve
-
-  capture_outputs:
-    name: Capture Outputs
-    needs: workspace_config
-    runs-on: ubuntu-latest
-    outputs:
-      workspace_url: ${{ steps.out.outputs.workspace_url }}
-      workspace_id:  ${{ steps.out.outputs.workspace_id }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Azure login (bootstrap)
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.6.6
-      - name: Terraform output (databricks-workspace)
-        id: out
-        run: |
-          URL=$(terraform -chdir=databricks-workspace output -raw workspace_url)
-          ID=$(terraform -chdir=databricks-workspace output -raw workspace_id)
-          echo "workspace_url=$URL" >> $GITHUB_OUTPUT
-          echo "workspace_id=$ID"   >> $GITHUB_OUTPUT
