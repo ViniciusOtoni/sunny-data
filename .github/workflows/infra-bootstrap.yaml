@@ -2,6 +2,21 @@ name: infra-bootstrap
 
 on:
   workflow_call:
+    secrets:
+      ARM_SUBSCRIPTION_ID:
+        required: true
+      ARM_TENANT_ID:
+        required: true
+      ARM_CLIENT_ID:
+        required: true
+      ARM_CLIENT_SECRET:
+        required: true
+      ARM_OBJECT_ID:
+        required: true
+      AZURE_CREDENTIALS:
+        required: true
+      ARM_ACCOUNT_ID:
+        required: true
     outputs:
       workspace_url:
         description: "Databricks workspace URL"
