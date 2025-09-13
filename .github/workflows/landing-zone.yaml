@@ -1,13 +1,37 @@
 name: landing-zone
+
 on:
-  workflow_run:
-    workflows: ["core-identity"]
-    types: [completed]
+  workflow_call:
+    secrets:
+      ARM_SUBSCRIPTION_ID: { required: true }
+      ARM_TENANT_ID:       { required: true }
+      ARM_CLIENT_ID:       { required: true }
+      ARM_CLIENT_SECRET:   { required: true }
+      AZURE_CREDENTIALS:   { required: true }
+    outputs:
+      state_rg_name:
+        description: "RG do backend remoto"
+        value: ${{ jobs.lz.outputs.state_rg_name }}
+      state_sa_name:
+        description: "SA do backend remoto"
+        value: ${{ jobs.lz.outputs.state_sa_name }}
+      state_container:
+        description: "Container do backend remoto (tfstate)"
+        value: ${{ jobs.lz.outputs.state_container }}
+
+permissions:
+  contents: read
+  id-token: write
+  actions: write
 
 jobs:
-  landing-zone:
+  lz:
+    name: landing-zone
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    outputs:
+      state_rg_name: ${{ steps.tfout.outputs.rg }}
+      state_sa_name: ${{ steps.tfout.outputs.sa }}
+      state_container: tfstate
     env:
       TF_VAR_subscription_id:     ${{ secrets.ARM_SUBSCRIPTION_ID }}
       TF_VAR_tenant_id:           ${{ secrets.ARM_TENANT_ID }}
@@ -18,17 +42,18 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      # artefato do core-identity (state local gerado no job anterior)
-      - name: Download core-identity tfstate
-        uses: dawidd6/action-download-artifact@v3
         with:
-          workflow: core-identity
-          run_id:  ${{ github.event.workflow_run.id }}
-          name: tfstate-core
-          path: core-identity
+          repository: ViniciusOtoni/sunny-data
+          ref: main
 
-      - name: Azure login
+      # baixa o tfstate do core-identity GERADO neste mesmo run (artifact local ao caller)
+      - name: Download core-identity tfstate
+        uses: actions/download-artifact@v4
+        with:
+          name: tfstate-core
+          path: core-identity   # ficará em core-identity/terraform.tfstate
+
+      - name: Azure Login (bootstrap)
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
@@ -37,14 +62,12 @@ jobs:
         with:
           terraform_version: 1.6.6
 
-      # 1) Bootstrapping – backend LOCAL no landing-zone
+      # 1) Bootstrapping: backend LOCAL para criar SA do state
       - name: Switch backend to local temporarily
         run: |
-          mv landing-zone/backend.tf landing-zone/backend_remote.bak
+          mv landing-zone/backend.tf landing-zone/backend_remote.bak || true
           cat <<'EOF' > landing-zone/backend.tf
-          terraform {
-            backend "local" {}
-          }
+          terraform { backend "local" {} }
           EOF
 
       - name: Terraform init (local)
@@ -53,7 +76,7 @@ jobs:
       - name: Terraform apply (create SA)
         run: terraform -chdir=landing-zone apply -auto-approve
 
-      # captura SA e RG e a access key
+      # captura SA/RG e access key
       - name: Capture outputs
         id: tfout
         run: |
@@ -68,12 +91,12 @@ jobs:
           echo "rg=$RG"     >> $GITHUB_OUTPUT
           echo "ackey=$ACCESS_KEY" >> $GITHUB_OUTPUT
 
-      # 2) Migração – backend AZURERM do landing-zone
+      # 2) Migração: landing-zone -> backend azurerm
       - name: Restore azurerm backend file
         run: |
-          mv landing-zone/backend_remote.bak landing-zone/backend.tf
+          mv landing-zone/backend_remote.bak landing-zone/backend.tf || true
 
-      - name: Migrate landing-zone state
+      - name: Migrate landing-zone state to azurerm
         env:
           ARM_ACCESS_KEY: ${{ steps.tfout.outputs.ackey }}
         run: |
@@ -84,19 +107,15 @@ jobs:
             -backend-config="key=landing.tfstate" \
             -migrate-state -force-copy
 
-      # 3) Migra o state do core-identity para o mesmo backend remoto
-      - name: Migrate core-identity state to azurerm backend
-        if: hashFiles('core-identity/terraform.tfstate') != ''
+      # 3) Migração: core-identity -> backend azurerm (reutiliza tfstate-core baixado)
+      - name: Migrate core-identity state to azurerm
         env:
           ARM_ACCESS_KEY: ${{ steps.tfout.outputs.ackey }}
         run: |
           cd core-identity
-          # troca o backend de local -> azurerm (necessário para migrar)
-          if [ -f backend.tf ]; then mv backend.tf backend_local.bak; fi
+          # troca o backend de local -> azurerm para migrar
           cat <<'EOF' > backend.tf
-          terraform {
-            backend "azurerm" {}
-          }
+          terraform { backend "azurerm" {} }
           EOF
           terraform init \
             -backend-config="resource_group_name=${{ steps.tfout.outputs.rg }}" \

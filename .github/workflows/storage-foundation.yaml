@@ -1,10 +1,11 @@
 name: storage-foundation
+
 on:
-  workflow_run:
-    workflows: ["landing-zone"]
-    types: [completed]
-  
-  workflow_dispatch: {}
+  workflow_call:
+    secrets:
+      AZURE_CREDENTIALS:   { required: true }
+      ARM_SUBSCRIPTION_ID: { required: true }
+      ARM_TENANT_ID:       { required: true }
 
 permissions:
   contents: read
@@ -13,21 +14,22 @@ permissions:
 
 jobs:
   deploy-storage:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     env:
-      TF_VAR_subscription_id:   ${{ secrets.ARM_SUBSCRIPTION_ID }}
-      TF_VAR_tenant_id:         ${{ secrets.ARM_TENANT_ID }}
-     
+      TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id:       ${{ secrets.ARM_TENANT_ID }}
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ViniciusOtoni/sunny-data
+          ref: main
 
       # 0) Código + login com a SPN BOOTSTRAP (Owner)
       - name: Azure Login
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }} 
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - uses: hashicorp/setup-terraform@v3
         with:
@@ -37,28 +39,25 @@ jobs:
       - name: Fetch dynamic-SPN creds from Key Vault
         id: kv
         run: |
-          KV_NAME="akv-medalforge-rbac-core" 
-          SPN_ID=$(az keyvault secret show --vault-name $KV_NAME --name spn-client-id     --query value -o tsv)
-          SPN_SECRET=$(az keyvault secret show --vault-name $KV_NAME --name spn-client-secret --query value -o tsv)
+          KV_NAME="akv-medalforge-rbac-core"
+          SPN_ID=$(az keyvault secret show --vault-name "$KV_NAME" --name spn-client-id     --query value -o tsv)
+          SPN_SECRET=$(az keyvault secret show --vault-name "$KV_NAME" --name spn-client-secret --query value -o tsv)
 
           echo "::add-mask::$SPN_SECRET"
 
-          # Variáveis usadas pelas inputs do módulo
-          echo "TF_VAR_spn_client_id=$SPN_ID"        >> $GITHUB_ENV
-          echo "TF_VAR_spn_client_secret=$SPN_SECRET" >> $GITHUB_ENV
+          # Variáveis usadas pelos módulos Terraform
+          echo "TF_VAR_spn_client_id=$SPN_ID"          >> $GITHUB_ENV
+          echo "TF_VAR_spn_client_secret=$SPN_SECRET"  >> $GITHUB_ENV
 
           # Variáveis que o provider 'azurerm' reconhece implicitamente
-          echo "ARM_CLIENT_ID=$SPN_ID"               >> $GITHUB_ENV
-          echo "ARM_CLIENT_SECRET=$SPN_SECRET"       >> $GITHUB_ENV
-          echo "ARM_SUBSCRIPTION_ID=$TF_VAR_subscription_id"           >> $GITHUB_ENV
-          echo "ARM_TENANT_ID=$TF_VAR_tenant_id"                       >> $GITHUB_ENV
+          echo "ARM_CLIENT_ID=$SPN_ID"                 >> $GITHUB_ENV
+          echo "ARM_CLIENT_SECRET=$SPN_SECRET"         >> $GITHUB_ENV
+          echo "ARM_SUBSCRIPTION_ID=${{ env.TF_VAR_subscription_id }}" >> $GITHUB_ENV
+          echo "ARM_TENANT_ID=${{ env.TF_VAR_tenant_id }}"             >> $GITHUB_ENV
 
-
-      # 2) Terraform (autenticado como SPN dinâmica) + backend autenticado
+      # 2) Terraform (autenticado como SPN dinâmica)
       - name: Terraform init
         run: terraform -chdir=storage-foundation init
 
       - name: Terraform apply
         run: terraform -chdir=storage-foundation apply -auto-approve
-
-      

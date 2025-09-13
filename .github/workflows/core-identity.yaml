@@ -1,22 +1,24 @@
 name: core-identity
+
 on:
-  push:
-    paths:
-      - 'core-identity/**'
-  workflow_dispatch: {}
-  
-# permitir upload de artefatos
+  workflow_call:
+    secrets:
+      ARM_SUBSCRIPTION_ID: { required: true }
+      ARM_TENANT_ID:       { required: true }
+      ARM_CLIENT_ID:       { required: true }
+      ARM_CLIENT_SECRET:   { required: true }
+      ARM_OBJECT_ID:       { required: true }
+      AZURE_CREDENTIALS:   { required: true }
+
 permissions:
   contents: read
-  id-token: write          
-  actions: write            
+  id-token: write
+  actions: write  # precisa para upload de artifact
 
 jobs:
   Deployment-Core-Ecosystem:
     runs-on: ubuntu-latest
-
     env:
-      # Secrets configurados em Settings > Actions > Secrets
       TF_VAR_subscription_id:     ${{ secrets.ARM_SUBSCRIPTION_ID }}
       TF_VAR_tenant_id:           ${{ secrets.ARM_TENANT_ID }}
       TF_VAR_admin_client_id:     ${{ secrets.ARM_CLIENT_ID }}
@@ -25,9 +27,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ViniciusOtoni/sunny-data
+          ref: main
 
-      # Faz login na Azure com a SPN bootstrap (Owner)
-      - name: Azure Login
+      - name: Azure Login (bootstrap)
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
@@ -36,14 +40,15 @@ jobs:
         with:
           terraform_version: 1.6.6
 
-      - name: Terraform Init
+      # backend LOCAL 
+      - name: Terraform Init (local)
         run: terraform -chdir=core-identity init
 
-      - name: Terraform Apply
+      - name: Terraform Apply (core-identity)
         run: terraform -chdir=core-identity apply -auto-approve
 
-        # Fazendo upload do tfstate no artefato > Utilizado para consumir no próximo JOB
-      - name: Upload Terraform state
+      # disponibiliza o tfstate para o PRÓXIMO micro baixar no MESMO run
+      - name: Upload Terraform state (core-identity)
         uses: actions/upload-artifact@v4
         with:
           name: tfstate-core
