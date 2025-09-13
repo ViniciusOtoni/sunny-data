@@ -67,7 +67,9 @@ jobs:
         run: |
           mv landing-zone/backend.tf landing-zone/backend_remote.bak || true
           cat <<'EOF' > landing-zone/backend.tf
-          terraform { backend "local" {} }
+          terraform { 
+            backend "local" {} 
+          }
           EOF
 
       - name: Terraform init (local)
@@ -115,7 +117,9 @@ jobs:
           cd core-identity
           # troca o backend de local -> azurerm para migrar
           cat <<'EOF' > backend.tf
-          terraform { backend "azurerm" {} }
+          terraform { 
+            backend "azurerm" {} 
+          }
           EOF
           terraform init \
             -backend-config="resource_group_name=${{ steps.tfout.outputs.rg }}" \
