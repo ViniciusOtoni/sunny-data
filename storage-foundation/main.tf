@@ -57,7 +57,7 @@ resource "azurerm_role_assignment" "to_lake" {
 }
 
 # Permissão para a SPN dinâmica 
-resource "azurerm_role_assignment" "to_lake" {
+resource "azurerm_role_assignment" "spn_to_lake" {
   scope                = module.storage_lake.storage_account_id
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = local.spn_object_id
