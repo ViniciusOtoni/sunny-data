@@ -146,9 +146,12 @@ jobs:
           ARM_ACCESS_KEY: ${{ steps.tfout.outputs.ackey }}
         run: |
           cd core-identity
+          # troca o backend de local -> azurerm (necessário para migrar)
           if [ -f backend.tf ]; then mv backend.tf backend_local.bak; fi
           cat <<'EOF' > backend.tf
-          terraform { backend "azurerm" {} }
+          terraform {
+            backend "azurerm" {}
+          }
           EOF
           terraform init \
             -backend-config="resource_group_name=${{ steps.tfout.outputs.rg }}" \
@@ -156,6 +159,7 @@ jobs:
             -backend-config="container_name=tfstate" \
             -backend-config="key=core.tfstate" \
             -migrate-state -force-copy
+
 
   storage_foundation:
     name: Storage Foundation
