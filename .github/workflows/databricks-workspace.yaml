@@ -6,6 +6,11 @@ on:
       AZURE_CREDENTIALS:   { required: true }
       ARM_SUBSCRIPTION_ID: { required: true }
       ARM_TENANT_ID:       { required: true }
+    outputs:
+      workspace_id:
+        description: "ARM resourceId da Databricks workspace"
+        value: ${{ jobs.capture_outputs.outputs.workspace_id }}
+
 
 
 permissions:
@@ -76,3 +81,32 @@ jobs:
         run: |
           az network watcher configure --locations brazilsouth --enabled false
           az group delete -n NetworkWatcherRG --yes --no-wait || true
+    
+  capture_outputs:
+    name: Capture Terraform outputs
+    needs: cleanup-network-watcher
+    runs-on: ubuntu-latest
+    outputs:
+      workspace_id:  ${{ steps.out.outputs.workspace_id }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ViniciusOtoni/sunny-data
+          ref: main
+
+      - name: Azure login (bootstrap)
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Setup Terraform 1.6.6
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.6
+
+      - name: Read outputs from TF state
+        id: out
+        run: |
+          terraform -chdir=databricks-workspace init -reconfigure
+          ID=$(terraform -chdir=databricks-workspace output -raw workspace_id)
+          echo "workspace_id=$ID"   >> $GITHUB_OUTPUT
