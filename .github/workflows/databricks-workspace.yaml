@@ -7,9 +7,9 @@ on:
       ARM_SUBSCRIPTION_ID: { required: true }
       ARM_TENANT_ID:       { required: true }
     outputs:
-      workspace_id:
-        description: "ARM resourceId da Databricks workspace"
-        value: ${{ jobs.capture_outputs.outputs.workspace_id }}
+      workspace_url:
+        description: "URL (host) da Databricks workspace"
+        value: ${{ jobs.deploy-dbx.outputs.workspace_url }}
 
 
 
@@ -22,7 +22,7 @@ jobs:
   deploy-dbx:
     runs-on: ubuntu-latest
     outputs:
-      workspace_id: ${{ steps.out.outputs.workspace_id }}
+      workspace_url: ${{ steps.out.outputs.workspace_url }}
     env:
       TF_VAR_subscription_id: ${{ secrets.ARM_SUBSCRIPTION_ID }}
       TF_VAR_tenant_id:       ${{ secrets.ARM_TENANT_ID }}
@@ -72,13 +72,13 @@ jobs:
       - name: Terraform apply (workspace)
         run: terraform -chdir=databricks-workspace apply -auto-approve
 
-        # -> Lê o output direto AQUI e exporta como output do job/workflow_call
+      # Publica apenas o workspace_url (não secreto)
       - name: Read outputs from TF state
         id: out
         run: |
           set -euo pipefail
-          ID=$(terraform -chdir=databricks-workspace output -raw workspace_id)
-          echo "workspace_id=$ID" >> $GITHUB_OUTPUT
+          URL=$(terraform -chdir=databricks-workspace output -raw workspace_url)
+          echo "workspace_url=$URL" >> $GITHUB_OUTPUT
 
   cleanup-network-watcher:
     needs: deploy-dbx
