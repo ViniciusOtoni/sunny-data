@@ -63,3 +63,10 @@ resource "azurerm_role_assignment" "spn_to_lake" {
   principal_id         = local.spn_object_id
   provider             = azurerm.admin
 }
+
+resource "azurerm_role_assignment" "spn_az_table_to_lake" {
+  scope                = module.storage_lake.storage_account_id
+  role_definition_name = "Storage Table Data Contributor"
+  principal_id         = local.spn_object_id
+  provider             = azurerm.admin
+}
