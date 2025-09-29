@@ -5,7 +5,7 @@ locals {
   engineer_catalog_privs    = ["BROWSE","USE_CATALOG","CREATE_SCHEMA","READ_VOLUME","WRITE_VOLUME", "MANAGE"]
   consumer_bronze_privs     = ["BROWSE","USE_CATALOG", "USE SCHEMA", "SELECT"]
   consumer_silver_privs     = ["BROWSE","USE_CATALOG", "USE SCHEMA", "SELECT"]
-  engineer_monitoring_privs = ["BROWSE","USE_CATALOG","CREATE_SCHEMA"]
+  engineer_monitoring_privs = ["BROWSE","USE_CATALOG","CREATE_SCHEMA", "MANAGE" ]
 }
 
 resource "time_sleep" "after_admin_grant" {
