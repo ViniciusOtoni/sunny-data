@@ -18,8 +18,7 @@ O repositório "sunny-data" é um dos componentes da solução [One Data](https:
 2. [Arquitetura Técnica](#2-arquitetura-técnica)  
 
 3. [Terraform](#3-terraform)  
-   - [Arquitetura de Módulos](#31-arquitetura-de-módulos)  
-   - [Vídeo Técnico](#32-vídeo-técnico-demostração-no-projeto)  
+   - [Arquitetura de Módulos](#31-arquitetura-de-módulos)   
 
 4. [Least Privilege](#4-least-privelege)  
 
@@ -31,7 +30,6 @@ O repositório "sunny-data" é um dos componentes da solução [One Data](https:
    - [workspace-config](#55-workspace-config)  
 
 6. [GitHub Actions](#6-github-actions)  
-   - [Vídeo Técnico](#61-vídeo-técnico-demostração-no-projeto)  
 
 7. [Sync Databricks (IAM)](#7-sync-databricks-iam)  
    - [Funcionamento](#71-funcionamento)  
@@ -39,13 +37,9 @@ O repositório "sunny-data" é um dos componentes da solução [One Data](https:
    - [Integração com Terraform](#73-integração-com-terraform)  
    - [Grants e permissões](#74-grants-e-permissões)  
 
-8. [Pré-requisitos (Setup)](#8-pré-requisitos-setup)  
-   - [Criação da SPN Bootstrap](#81-criaçao-da-spn-bootstrap)  
-   - [Atribuição da SPN dinâmica como Account Admin](#82-atribuição-da-spn-dinâmica-como-account-admin)  
+8. [Melhorias Futuras](#8-melhorias-futuras)  
 
-9. [Melhorias Futuras](#9-melhorias-futuras)  
-
-10. [Referências](#10-referências)
+9. [Referências](#9-referências)
 
 ---
 
@@ -164,12 +158,6 @@ Neste projeto, a implementação segue a arquitetura de módulos, que organiza o
 Na prática, os microserviços (pastas ou repositórios separados) são responsáveis por consumir os módulos criados, compondo a infraestrutura final de maneira modular e reutilizável, ao invés de concentrar toda a lógica em um único monólito de Terraform.
 
 
-### 3.2 Vídeo Técnico (Demostração no Projeto!)
-
-<video width="100%" height="300px" controls>
-  <source src="./assets/videos/demo.mp4" type="video/mp4">
-</video>
-
 ---
 
 ## 4. Least Privelege
@@ -233,12 +221,6 @@ Essa abordagem possibilita construir pipelines de automação robustos, onde mú
 
 Finalizando, o GitHub Actions possui uma ótima conectividade com a Azure através da action @azure/login@v2
 
-### 6.1 Vídeo Técnico (Demostração no Projeto!)
-
-<video width="100%" height="300px" controls>
-  <source src="./assets/videos/demo.mp4" type="video/mp4">
-</video>
-
 ---
 
 ## 7. Sync Databricks (IAM)
@@ -287,106 +269,7 @@ Esse modelo garante que toda a governança de dados seja integrada ao IAM corpor
 
 ---
 
-## 8. Pré-requisitos (Setup)
-
-- Conta na Azure
-- Subscrição na Azure
-- Realizar o az login
-
-### 8.1 Criaçao da SPN Bootstrap:
-
-````bash
-az ad sp create-for-rbac --name "terraform-admin-spn-user" --role="Contributor" --scopes="/subscriptions/<subscriptionID>"
-````
-
-Será retornado o *PASSWORD*, *TENANT* e *APPID* após a criação. Esses valores, precisam ser cadastrados nas Secrets do repositório GitHub.
-
-- **ARM_CLIENT_SECRET** -> *PASSWORD*
-- **ARM_TENANT_ID** -> *TENANT*
-- **ARM_CLIENT_ID** -> *APPID*
-- **ARM_SUBSCRIPTION_ID** -> *subscriptionID*
-
-<video width="40%" height="300px" controls>
-  <source src="./assets/videos/adicionar-secret.mp4" type="video/mp4">
-</video>
-
-- Recupere o *OBJECT_ID* para gravar na secret **ARM_OBJECT_ID**
-
-````bash
-az ad sp show --id <appId> --query id -o tsv  
-````
-
-- Cadastre os valores seguindo esse formato em JSON na secret **AZURE_CREDENTIALS**
-
-````json
-{
-  "clientId": <appId>,
-  "clientSecret": <password>,
-  "tenantId":   <tenant>,
-  "subscriptionId": <subscriptionId>
-}
-````
-
-- Atribua a role de *User Access Administrator* para a SPN
-
-````bash
-az role assignment create \
-    --assignee-object-id <SPN_OBJECT_ID> \
-    --role "User Access Administrator" \
-    --scope "/subscriptions/<subscriptionId>"
-````
-
-- Atribuir a SPN como Cloud Application Administrator
-
-<video width="40%" height="300px" controls>
-  <source src="./assets/videos/cloud-application.mp4" type="video/mp4">
-</video>
-
-- Adicione essas duas roles no Microsoft Graph *Directory.ReadWrite.All* e *Group.ReadWrite.All*
-
-<video width="40%" height="300px" controls>
-  <source src="./assets/videos/MicrosoftGraph.mp4" type="video/mp4">
-</video>
-
-### 8.2 Atribuição da SPN dinâmica como Account Admin
-
-> Essa etapa deve ser realizada apenas quando o workflow databricks-workspace exigir validação no JOB **🚦 Aguardar grant account_admin**
-
-- Entre no console de account do Databricks (https://accounts.azuredatabricks.net/)
-    Para logar, informe o seu e-mail **UPN** recuperado no Microsoft Entra ID
-
-<video width="40%" height="300px" controls>
-  <source src="./assets/videos/UPN.mp4" type="video/mp4">
-</video>
-
-- Atribua a SPN dinâmica como Account Admin
-
-<video width="40%" height="300px" controls>
-  <source src="./assets/videos/accountAdmin.mp4" type="video/mp4">
-</video>
-
-
-- Delete o metastore criado por Default
-
-<video width="40%" height="300px" controls>
-  <source src="./assets/videos/metastore.mp4" type="video/mp4">
-</video>
-
-- Recupere o valor do Account ID e grave na secret do GitHub **ARM_ACCOUNT_ID**
-
-<video width="40%" height="300px" controls>
-  <source src="./assets/videos/accountID.mp4" type="video/mp4">
-</video>
-
-- Aprovar JOB para finalização do Workflow
-
-<video width="40%" height="300px" controls>
-  <source src="./assets/videos/approvement.mp4" type="video/mp4">
-</video>
-
----
-
-## 9. Melhorias Futuras
+## 8. Melhorias Futuras
 
 Abaixo estão listadas algumas melhorias que podem ser incorporadas ao projeto. É importante destacar que o processo atual é um protótipo desenvolvido no contexto do programa Data Master, organizado pela F1rst Santander.
 
@@ -406,7 +289,7 @@ Nos Storage Accounts, podem ser configuradas políticas de Lifecycle Management,
 
 ---
 
-## 10. Referências
+## 9. Referências
 
 - [Terraform Docs](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs)
 - [GitHub Actions Docs](https://docs.github.com/pt/actions)
