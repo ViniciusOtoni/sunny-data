@@ -6,7 +6,7 @@
 
 
 
-O repositório "sunny-data" é um dos componentes da solução [One Data](https://github.com/ViniciusOtoni/medalforge-lakehouse-data) para o programa Data Master organizado pela F1rst Santander. Solução proposta e desenvolvida por [Vinicius Otoni](http://linkedin.com/in/vinicius-otoni-b330b3295/)
+O repositório "sunny-data" é um dos componentes da solução [One Data](https://github.com/ViniciusOtoni/one-data) para o programa Data Master organizado pela F1rst Santander. Solução proposta e desenvolvida por [Vinicius Otoni](http://linkedin.com/in/vinicius-otoni-b330b3295/)
 
 ## Conteúdos do Repositório
 
